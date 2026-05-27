@@ -267,7 +267,7 @@
           </section>
 
           <section id="market" class="page" data-page="market">
-            <section class="panel market-panel">
+            <section id="marketPanel" class="panel market-panel">
               <div class="panel-head market-head">
                 <div>
                   <p class="eyebrow">Market Terminal</p>
@@ -294,7 +294,25 @@
                     </select>
                   </label>
                   <button id="klineRefresh" class="refresh-button" type="button">刷新</button>
+                  <button id="marketFullscreen" class="refresh-button ghost" type="button">全屏</button>
                 </div>
+              </div>
+              <div class="market-probar">
+                <div id="intervalButtons" class="interval-buttons" aria-label="快速周期">
+                  <button type="button" data-interval="1m">1m</button>
+                  <button type="button" data-interval="5m">5m</button>
+                  <button type="button" data-interval="15m">15m</button>
+                  <button type="button" data-interval="30m">30m</button>
+                  <button type="button" data-interval="60m">60m</button>
+                  <button class="active" type="button" data-interval="1d">1D</button>
+                </div>
+                <div id="symbolRack" class="symbol-rack" aria-label="常用标的">
+                  <button type="button" data-symbol="000001.SZ">平安银行</button>
+                  <button type="button" data-symbol="600000.SH">浦发银行</button>
+                  <button type="button" data-symbol="300750.SZ">宁德时代</button>
+                  <button type="button" data-symbol="000300.SH">沪深300</button>
+                </div>
+                <div id="marketLatency" class="latency-badge">等待行情源</div>
               </div>
               <div id="klineSummary" class="market-summary"></div>
               <div id="externalMarketWidget" class="external-market-widget" aria-label="External market widget"></div>

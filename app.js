@@ -15,6 +15,16 @@ const KLINE_STATIC_URLS = {
 const LIGHTWEIGHT_CHARTS_URL =
   "https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js";
 const TRADINGVIEW_WIDGET_URL = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+const LOCAL_KLINE_CACHE_MS = 45_000;
+
+const INTERVAL_LABELS = {
+  "1m": "1 分钟",
+  "5m": "5 分钟",
+  "15m": "15 分钟",
+  "30m": "30 分钟",
+  "60m": "60 分钟",
+  "1d": "日线",
+};
 
 const PAGE_META = {
   overview: ["Research Pipeline", "量化研究工作台"],
@@ -69,6 +79,9 @@ let state = {
   market: {
     mode: "external",
     widgetKey: null,
+    cache: new Map(),
+    inFlight: null,
+    latencyMs: null,
   },
 };
 
@@ -865,6 +878,13 @@ function fmtVolume(value) {
   return fmtMoney(number);
 }
 
+function setMarketLatency(text, tone = "neutral") {
+  const el = document.querySelector("#marketLatency");
+  if (!el) return;
+  el.textContent = text;
+  el.className = `latency-badge ${tone}`;
+}
+
 function ensureLightweightCharts() {
   if (window.LightweightCharts) return Promise.resolve(true);
   if (state.kline.scriptReady) return state.kline.scriptReady;
@@ -882,26 +902,41 @@ function ensureLightweightCharts() {
 function klineQuery() {
   const symbol = document.querySelector("#klineSymbol")?.value?.trim() || "000001.SZ";
   const interval = document.querySelector("#klineInterval")?.value || "1d";
-  const limit = interval === "1d" ? 260 : 320;
+  const limit = interval === "1d" ? 520 : interval === "1m" ? 960 : 640;
   const params = new URLSearchParams({ symbol, interval, limit: String(limit) });
   return { symbol, interval, limit, url: `${KLINE_API_URL}?${params.toString()}` };
 }
 
 async function fetchKlinePayload(query) {
+  const cacheKey = `${query.symbol.toUpperCase()}|${query.interval}|${query.limit}`;
+  const cached = state.market.cache.get(cacheKey);
+  if (cached && Date.now() - cached.loadedAt < LOCAL_KLINE_CACHE_MS) {
+    return {
+      ...cached.payload,
+      meta: {
+        ...(cached.payload.meta || {}),
+        cache_hit: true,
+      },
+    };
+  }
   const fallbackUrl = KLINE_STATIC_URLS[query.interval] || KLINE_STATIC_URLS["1d"];
   const urls = [query.url, fallbackUrl];
   let lastError = null;
+  const startedAt = performance.now();
   for (const url of urls) {
     try {
       const payload = await fetchJsonLoose(url);
       if (payload?.bars?.length) {
-        return {
+        const result = {
           ...payload,
           meta: {
             ...(payload.meta || {}),
             delivery: url === query.url ? "local-api" : "static-sample",
+            load_ms: Math.round(performance.now() - startedAt),
           },
         };
+        state.market.cache.set(cacheKey, { payload: result, loadedAt: Date.now() });
+        return result;
       }
     } catch (error) {
       lastError = error;
@@ -923,13 +958,20 @@ function renderKlineSummary(payload) {
   const change = last && prev && finite(prev.close) !== 0 ? finite(last.close) / finite(prev.close) - 1 : null;
   const meta = payload?.meta || {};
   const delivery = meta.delivery === "local-api" ? "本地 API" : "静态样例";
+  const loadNote = meta.cache_hit ? "缓存命中" : `${meta.load_ms ?? "-"} ms`;
+  setMarketLatency(
+    meta.delivery === "local-api"
+      ? `本地缓存读取 · ${loadNote}`
+      : `样例数据 · ${loadNote}`,
+    meta.delivery === "local-api" ? "good" : "warn"
+  );
   summary.innerHTML = last
     ? [
         ["标的", `${meta.symbol || "--"} ${meta.name || ""}`.trim(), `${meta.interval || "--"} · ${delivery}`],
         ["最新价", fmtNum(last.close, 2), last.label || last.time],
         ["涨跌", isFiniteNumber(change) ? fmtPct(change, { signed: true }) : "-", "相邻 K 线"],
         ["成交量", fmtVolume(last.volume), "原始本地字段"],
-        ["数据源", String(meta.count || bars.length), meta.source || "-"],
+        ["延迟", loadNote, meta.source || "-"],
       ]
         .map(
           ([label, value, note]) => `<div class="summary-chip">
@@ -944,6 +986,7 @@ function renderKlineSummary(payload) {
 
 function normalizeMarketSymbol(symbol) {
   const raw = String(symbol || "000001.SZ").trim().toUpperCase();
+  if (/^\d{6}\.SH$/i.test(raw) && raw.startsWith("000")) return `SSE:${raw.slice(0, 6)}`;
   if (/^\d{6}\.(SH|SS)$/i.test(raw)) return `SSE:${raw.slice(0, 6)}`;
   if (/^\d{6}\.SZ$/i.test(raw)) return `SZSE:${raw.slice(0, 6)}`;
   if (/^SH\d{6}$/i.test(raw)) return `SSE:${raw.slice(2)}`;
@@ -977,12 +1020,13 @@ function renderExternalMarketSummary() {
   const symbol = document.querySelector("#klineSymbol")?.value?.trim() || "000001.SZ";
   const interval = document.querySelector("#klineInterval")?.value || "1d";
   const tvSymbol = normalizeMarketSymbol(symbol);
+  setMarketLatency("外部行情 · 实时性取决于 TradingView/交易所授权", "good");
   summary.innerHTML = [
     ["标的", symbol.toUpperCase(), tvSymbol],
     ["数据源", "TradingView", "外部嵌入组件"],
-    ["周期", interval, `widget interval ${tradingViewInterval(interval)}`],
+    ["周期", INTERVAL_LABELS[interval] || interval, `widget interval ${tradingViewInterval(interval)}`],
     ["部署模式", "轻量服务器", "不落盘行情数据"],
-    ["本地增强", "/api/kline", "有本地数据时可切换"],
+    ["实时性", "交易所授权决定", "A股公网组件可能存在延迟"],
   ]
     .map(
       ([label, value, note]) => `<div class="summary-chip">
@@ -1031,6 +1075,7 @@ function renderExternalMarketWidget() {
 
 function renderMarket() {
   setMarketMode(state.market.mode);
+  syncIntervalButtons();
   if (state.market.mode === "external") {
     if (state.kline.chart) {
       state.kline.chart.remove();
@@ -1040,6 +1085,13 @@ function renderMarket() {
     return;
   }
   renderKline();
+}
+
+function syncIntervalButtons() {
+  const interval = document.querySelector("#klineInterval")?.value || "1d";
+  document.querySelectorAll("#intervalButtons button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.interval === interval);
+  });
 }
 
 function renderKlineFallback(container, bars) {
@@ -1081,6 +1133,7 @@ async function renderKline() {
   const container = document.querySelector("#klineChart");
   if (!container) return;
   container.innerHTML = `<div class="empty-state">正在读取本地 K 线数据...</div>`;
+  setMarketLatency("本地缓存读取中...", "neutral");
   const query = klineQuery();
   try {
     const payload = await fetchKlinePayload(query);
@@ -1152,8 +1205,37 @@ async function renderKline() {
     state.kline.chart = chart;
   } catch (error) {
     renderKlineSummary(null);
+    setMarketLatency(`本地K线失败 · ${error.message}`, "bad");
     container.innerHTML = `<div class="empty-state">K 线读取失败：${error.message}</div>`;
   }
+}
+
+async function toggleMarketFullscreen() {
+  const panel = document.querySelector("#marketPanel");
+  if (!panel) return;
+  try {
+    if (panel.classList.contains("fullscreen")) {
+      panel.classList.remove("fullscreen");
+    } else if (!document.fullscreenElement && panel.requestFullscreen) {
+      await panel.requestFullscreen();
+    } else if (document.fullscreenElement && document.exitFullscreen) {
+      await document.exitFullscreen();
+    } else {
+      panel.classList.toggle("fullscreen");
+    }
+  } catch {
+    panel.classList.toggle("fullscreen");
+  }
+  syncFullscreenButton();
+  window.setTimeout(renderMarket, 120);
+}
+
+function syncFullscreenButton() {
+  const panel = document.querySelector("#marketPanel");
+  const button = document.querySelector("#marketFullscreen");
+  if (!panel || !button) return;
+  const active = Boolean(document.fullscreenElement) || panel.classList.contains("fullscreen");
+  button.textContent = active ? "退出全屏" : "全屏";
 }
 
 function setupKlineControls() {
@@ -1163,10 +1245,27 @@ function setupKlineControls() {
   const interval = document.querySelector("#klineInterval");
   const external = document.querySelector("#marketModeExternal");
   const local = document.querySelector("#marketModeLocal");
+  const fullscreen = document.querySelector("#marketFullscreen");
   refresh?.addEventListener("click", renderMarket);
-  interval?.addEventListener("change", renderMarket);
+  interval?.addEventListener("change", () => {
+    syncIntervalButtons();
+    renderMarket();
+  });
   symbol?.addEventListener("keydown", (event) => {
     if (event.key === "Enter") renderMarket();
+  });
+  document.querySelectorAll("#intervalButtons button").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (interval) interval.value = button.dataset.interval;
+      syncIntervalButtons();
+      renderMarket();
+    });
+  });
+  document.querySelectorAll("#symbolRack button").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (symbol) symbol.value = button.dataset.symbol;
+      renderMarket();
+    });
   });
   external?.addEventListener("click", () => {
     state.market.mode = "external";
@@ -1176,11 +1275,18 @@ function setupKlineControls() {
     state.market.mode = "local";
     renderMarket();
   });
+  fullscreen?.addEventListener("click", toggleMarketFullscreen);
+  document.addEventListener("fullscreenchange", () => {
+    syncFullscreenButton();
+    window.setTimeout(renderMarket, 120);
+  });
   window.addEventListener("resize", () => {
     if (!state.kline.chart) return;
     const container = document.querySelector("#klineChart");
     state.kline.chart.resize(container.clientWidth, container.clientHeight);
   });
+  syncIntervalButtons();
+  syncFullscreenButton();
   state.kline.controlsReady = true;
 }
 

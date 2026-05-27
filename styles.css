@@ -539,6 +539,81 @@ input:focus {
   border-color: var(--cyan);
 }
 
+.refresh-button.ghost {
+  background: transparent;
+}
+
+.market-probar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.interval-buttons,
+.symbol-rack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.interval-buttons button,
+.symbol-rack button {
+  min-height: 32px;
+  border: 1px solid #2b3d4c;
+  border-radius: 8px;
+  background: #0f1721;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.interval-buttons button {
+  min-width: 52px;
+}
+
+.symbol-rack button {
+  padding: 0 10px;
+}
+
+.interval-buttons button.active,
+.symbol-rack button:hover,
+.interval-buttons button:hover {
+  color: var(--text);
+  border-color: var(--cyan);
+  background: #182536;
+}
+
+.latency-badge {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid #314355;
+  border-radius: 8px;
+  color: var(--soft);
+  background: #101822;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.latency-badge.good {
+  border-color: rgba(67, 211, 158, 0.42);
+  color: var(--green);
+}
+
+.latency-badge.warn {
+  border-color: rgba(244, 189, 80, 0.42);
+  color: var(--amber);
+}
+
+.latency-badge.bad {
+  border-color: rgba(255, 111, 145, 0.42);
+  color: var(--rose);
+}
+
 .market-summary {
   display: grid;
   grid-template-columns: minmax(180px, 1.2fr) repeat(4, minmax(120px, 0.8fr));
@@ -603,6 +678,39 @@ input:focus {
 
 .hidden {
   display: none !important;
+}
+
+.market-panel:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  padding: 18px;
+  border: 0;
+  border-radius: 0;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.market-panel.fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  padding: 18px;
+  border: 0;
+  border-radius: 0;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.market-panel:fullscreen .external-market-widget,
+.market-panel.fullscreen .external-market-widget {
+  height: calc(100vh - 238px);
+  min-height: 520px;
+}
+
+.market-panel:fullscreen .kline-chart,
+.market-panel.fullscreen .kline-chart {
+  height: calc(100vh - 238px);
+  min-height: 520px;
 }
 
 .kline-note {
@@ -1071,6 +1179,7 @@ td {
 
   .metric-grid,
   .market-summary,
+  .market-probar,
   .chart-layout,
   .split-layout,
   .holdings-grid,
@@ -1152,5 +1261,9 @@ td {
 
   .external-market-widget {
     height: 520px;
+  }
+
+  .latency-badge {
+    white-space: normal;
   }
 }
