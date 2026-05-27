@@ -19,6 +19,7 @@
 
         <nav class="nav-stack" aria-label="Dashboard sections">
           <a href="#overview" class="nav-item active">概览</a>
+          <a href="#market" class="nav-item">看盘</a>
           <a href="#performance" class="nav-item">绩效</a>
           <a href="#pipeline" class="nav-item">框架</a>
           <a href="#risk" class="nav-item">风控</a>
@@ -73,6 +74,38 @@
           <div class="strip-item">
             <span class="strip-key">数据窗口</span>
             <strong id="windowLine">--</strong>
+          </div>
+        </section>
+
+        <section id="market" class="panel market-panel">
+          <div class="panel-head market-head">
+            <div>
+              <p class="eyebrow">Market Terminal</p>
+              <h2>本地 A 股 K 线看盘</h2>
+            </div>
+            <div class="market-controls">
+              <label class="field-label" for="klineSymbol">
+                <span>股票</span>
+                <input id="klineSymbol" value="000001.SZ" inputmode="latin" />
+              </label>
+              <label class="field-label" for="klineInterval">
+                <span>周期</span>
+                <select id="klineInterval">
+                  <option value="1d">日线</option>
+                  <option value="60m">60 分钟</option>
+                  <option value="30m">30 分钟</option>
+                  <option value="15m">15 分钟</option>
+                  <option value="5m">5 分钟</option>
+                  <option value="1m">1 分钟</option>
+                </select>
+              </label>
+              <button id="klineRefresh" class="refresh-button" type="button">刷新</button>
+            </div>
+          </div>
+          <div id="klineSummary" class="market-summary"></div>
+          <div id="klineChart" class="kline-chart" aria-label="K line chart"></div>
+          <div class="kline-note">
+            本地预览优先读取 <code>/api/kline</code>，GitHub Pages 自动降级为仓库样例数据；字段已统一为 Lightweight Charts 的 <code>time/open/high/low/close/volume</code>。
           </div>
         </section>
 

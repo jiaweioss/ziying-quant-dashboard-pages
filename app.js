@@ -1,6 +1,17 @@
 const LEGACY_URL = "./data/strategy_lab_results.json";
 const REAL_URL = "./data/backtest_result.json";
 const DEPLOY_INFO_URL = "./deploy-info.json";
+const KLINE_API_URL = "api/kline";
+const KLINE_STATIC_URLS = {
+  "1d": "./data/kline_000001_1d.json",
+  "60m": "./data/kline_000001_60m_20251231.json",
+  "30m": "./data/kline_000001_30m_20251231.json",
+  "15m": "./data/kline_000001_15m_20251231.json",
+  "5m": "./data/kline_000001_5m_20251231.json",
+  "1m": "./data/kline_000001_1m_20251231.json",
+};
+const LIGHTWEIGHT_CHARTS_URL =
+  "https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js";
 
 const colors = {
   multifactor: "#43d39e",
@@ -29,6 +40,12 @@ let state = {
   deploy: null,
   strategies: [],
   selectedId: null,
+  kline: {
+    payload: null,
+    chart: null,
+    controlsReady: false,
+    scriptReady: null,
+  },
 };
 
 const finite = (value, fallback = 0) =>
@@ -532,9 +549,227 @@ function renderRiskEvents() {
     : `<div class="empty-state">真实管线样本未产生风控事件</div>`;
 }
 
+function fmtVolume(value) {
+  if (!isFiniteNumber(value)) return "-";
+  const number = Number(value);
+  if (Math.abs(number) >= 100000000) return `${(number / 100000000).toFixed(2)}亿`;
+  if (Math.abs(number) >= 10000) return `${(number / 10000).toFixed(2)}万`;
+  return fmtMoney(number);
+}
+
+function ensureLightweightCharts() {
+  if (window.LightweightCharts) return Promise.resolve(true);
+  if (state.kline.scriptReady) return state.kline.scriptReady;
+  state.kline.scriptReady = new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = LIGHTWEIGHT_CHARTS_URL;
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+  return state.kline.scriptReady;
+}
+
+function klineQuery() {
+  const symbol = document.querySelector("#klineSymbol")?.value?.trim() || "000001.SZ";
+  const interval = document.querySelector("#klineInterval")?.value || "1d";
+  const limit = interval === "1d" ? 260 : 320;
+  const params = new URLSearchParams({ symbol, interval, limit: String(limit) });
+  return { symbol, interval, limit, url: `${KLINE_API_URL}?${params.toString()}` };
+}
+
+async function fetchKlinePayload(query) {
+  const fallbackUrl = KLINE_STATIC_URLS[query.interval] || KLINE_STATIC_URLS["1d"];
+  const urls = [query.url, fallbackUrl];
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const payload = await fetchJsonLoose(url);
+      if (payload?.bars?.length) {
+        return {
+          ...payload,
+          meta: {
+            ...(payload.meta || {}),
+            delivery: url === query.url ? "local-api" : "static-sample",
+          },
+        };
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("K line data unavailable");
+}
+
+function klineBarColor(bar) {
+  return finite(bar.close) >= finite(bar.open) ? colors.multifactor : colors.reversal_5;
+}
+
+function renderKlineSummary(payload) {
+  const summary = document.querySelector("#klineSummary");
+  if (!summary) return;
+  const bars = payload?.bars || [];
+  const last = bars.at(-1);
+  const prev = bars.length > 1 ? bars.at(-2) : null;
+  const change = last && prev && finite(prev.close) !== 0 ? finite(last.close) / finite(prev.close) - 1 : null;
+  const meta = payload?.meta || {};
+  const delivery = meta.delivery === "local-api" ? "本地 API" : "静态样例";
+  summary.innerHTML = last
+    ? [
+        ["标的", `${meta.symbol || "--"} ${meta.name || ""}`.trim(), `${meta.interval || "--"} · ${delivery}`],
+        ["最新价", fmtNum(last.close, 2), last.label || last.time],
+        ["涨跌", isFiniteNumber(change) ? fmtPct(change, { signed: true }) : "-", "相邻 K 线"],
+        ["成交量", fmtVolume(last.volume), "原始本地字段"],
+        ["数据源", String(meta.count || bars.length), meta.source || "-"],
+      ]
+        .map(
+          ([label, value, note]) => `<div class="summary-chip">
+            <span>${label}</span>
+            <strong class="${label === "涨跌" ? valueClass(change) : ""}">${value}</strong>
+            <em>${note}</em>
+          </div>`
+        )
+        .join("")
+    : `<div class="empty-state">暂无 K 线数据</div>`;
+}
+
+function renderKlineFallback(container, bars) {
+  const width = 1200;
+  const height = 520;
+  const pad = { top: 24, right: 48, bottom: 34, left: 36 };
+  const rows = bars.slice(-120);
+  const highs = rows.map((bar) => finite(bar.high));
+  const lows = rows.map((bar) => finite(bar.low));
+  const min = Math.min(...lows);
+  const max = Math.max(...highs);
+  const x = scaleLinear(0, Math.max(rows.length - 1, 1), pad.left, width - pad.right);
+  const y = scaleLinear(min, max, height - pad.bottom, pad.top);
+  const candleWidth = Math.max(3, Math.min(9, (width - pad.left - pad.right) / rows.length * 0.62));
+  const candles = rows
+    .map((bar, index) => {
+      const cx = x(index);
+      const openY = y(finite(bar.open));
+      const closeY = y(finite(bar.close));
+      const highY = y(finite(bar.high));
+      const lowY = y(finite(bar.low));
+      const color = klineBarColor(bar);
+      const bodyTop = Math.min(openY, closeY);
+      const bodyHeight = Math.max(Math.abs(openY - closeY), 1.5);
+      return `<line class="wick" x1="${cx}" x2="${cx}" y1="${highY}" y2="${lowY}" stroke="${color}" />
+        <rect class="candle" x="${cx - candleWidth / 2}" y="${bodyTop}" width="${candleWidth}" height="${bodyHeight}" fill="${color}" />`;
+    })
+    .join("");
+  const grid = [0, 0.25, 0.5, 0.75, 1]
+    .map((ratio) => {
+      const gy = pad.top + (height - pad.top - pad.bottom) * ratio;
+      return `<line class="grid-line" x1="${pad.left}" x2="${width - pad.right}" y1="${gy}" y2="${gy}" />`;
+    })
+    .join("");
+  container.innerHTML = `<svg class="fallback-candles" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">${grid}${candles}</svg>`;
+}
+
+async function renderKline() {
+  const container = document.querySelector("#klineChart");
+  if (!container) return;
+  container.innerHTML = `<div class="empty-state">正在读取本地 K 线数据...</div>`;
+  const query = klineQuery();
+  try {
+    const payload = await fetchKlinePayload(query);
+    state.kline.payload = payload;
+    renderKlineSummary(payload);
+    const bars = (payload.bars || []).map((bar) => ({
+      ...bar,
+      open: finite(bar.open),
+      high: finite(bar.high),
+      low: finite(bar.low),
+      close: finite(bar.close),
+      volume: finite(bar.volume),
+    }));
+    if (!bars.length) {
+      container.innerHTML = `<div class="empty-state">没有匹配的 K 线记录</div>`;
+      return;
+    }
+    if (state.kline.chart) {
+      state.kline.chart.remove();
+      state.kline.chart = null;
+    }
+    const hasLibrary = await ensureLightweightCharts();
+    if (!hasLibrary || !window.LightweightCharts) {
+      renderKlineFallback(container, bars);
+      return;
+    }
+    container.innerHTML = "";
+    const chart = LightweightCharts.createChart(container, {
+      layout: {
+        background: { type: "solid", color: "#0b1118" },
+        textColor: "#c8d5dc",
+      },
+      grid: {
+        vertLines: { color: "#1d2935" },
+        horzLines: { color: "#1d2935" },
+      },
+      rightPriceScale: { borderColor: "#263241" },
+      timeScale: {
+        borderColor: "#263241",
+        timeVisible: query.interval !== "1d",
+        secondsVisible: false,
+      },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    });
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: colors.multifactor,
+      downColor: colors.reversal_5,
+      borderUpColor: colors.multifactor,
+      borderDownColor: colors.reversal_5,
+      wickUpColor: colors.multifactor,
+      wickDownColor: colors.reversal_5,
+    });
+    candleSeries.setData(bars.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })));
+    const volumeSeries = chart.addHistogramSeries({
+      priceFormat: { type: "volume" },
+      priceScaleId: "",
+    });
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+    });
+    volumeSeries.setData(
+      bars.map((bar) => ({
+        time: bar.time,
+        value: bar.volume,
+        color: `${klineBarColor(bar)}66`,
+      }))
+    );
+    chart.timeScale().fitContent();
+    state.kline.chart = chart;
+  } catch (error) {
+    renderKlineSummary(null);
+    container.innerHTML = `<div class="empty-state">K 线读取失败：${error.message}</div>`;
+  }
+}
+
+function setupKlineControls() {
+  if (state.kline.controlsReady) return;
+  const refresh = document.querySelector("#klineRefresh");
+  const symbol = document.querySelector("#klineSymbol");
+  const interval = document.querySelector("#klineInterval");
+  refresh?.addEventListener("click", renderKline);
+  interval?.addEventListener("change", renderKline);
+  symbol?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") renderKline();
+  });
+  window.addEventListener("resize", () => {
+    if (!state.kline.chart) return;
+    const container = document.querySelector("#klineChart");
+    state.kline.chart.resize(container.clientWidth, container.clientHeight);
+  });
+  state.kline.controlsReady = true;
+}
+
 function renderLayerFlow() {
   const layers = [
     ["Data", "ashare API / SQLite", "字段标准化、复权价格、ST 过滤"],
+    ["Market", "local K-line API", "日线 CSV、分钟 ZIP、Pages 样例兜底"],
     ["Features", "price + liquidity factors", "截面去极值、Z-score、复合分"],
     ["Strategy", "HS300 multifactor", "排序选股、流动性过滤、持仓上限"],
     ["Portfolio", "weighting", "等权 / 分数权重 / 单票封顶"],
@@ -560,6 +795,7 @@ function renderContracts() {
   const deploy = state.deploy;
   const contracts = [
     ["Ashare API", "公开无 token", "http://43.103.51.239/ashare"],
+    ["Local K-line", "本地优先", "/api/kline?symbol=000001.SZ&interval=1d"],
     ["Python Client", "daily/data envelope", "AshareAPI.daily()"],
     ["Backtest JSON", real ? "已读取" : "缺失", "dashboard/data/backtest_result.json"],
     ["Legacy Lab JSON", state.legacy ? "已读取" : "缺失", "dashboard/data/strategy_lab_results.json"],
@@ -672,6 +908,8 @@ async function boot() {
   state.selectedId = historicalBest()?.id || state.strategies[0].id;
   renderSelect();
   renderAll();
+  setupKlineControls();
+  renderKline();
 }
 
 boot().catch((error) => {

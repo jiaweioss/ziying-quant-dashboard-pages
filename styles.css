@@ -180,7 +180,8 @@ h2 {
   gap: 10px;
 }
 
-select {
+select,
+input {
   color: var(--text);
   background: var(--panel);
   border: 1px solid var(--line);
@@ -190,7 +191,8 @@ select {
   outline: none;
 }
 
-select:focus {
+select:focus,
+input:focus {
   border-color: var(--cyan);
 }
 
@@ -338,6 +340,118 @@ select:focus {
 .chart {
   height: 430px;
   width: 100%;
+}
+
+.market-panel {
+  background:
+    linear-gradient(135deg, rgba(67, 211, 158, 0.08), transparent 38%),
+    linear-gradient(315deg, rgba(82, 183, 255, 0.08), transparent 42%),
+    rgba(17, 24, 34, 0.96);
+}
+
+.market-head {
+  align-items: center;
+}
+
+.market-controls {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.field-label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.field-label input,
+.field-label select {
+  min-width: 150px;
+  width: 150px;
+}
+
+.refresh-button {
+  height: 42px;
+  padding: 0 16px;
+  border: 1px solid #2f4659;
+  border-radius: 8px;
+  background: #172332;
+  color: var(--text);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.refresh-button:hover {
+  border-color: var(--cyan);
+}
+
+.market-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) repeat(4, minmax(120px, 0.8fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.summary-chip {
+  padding: 12px;
+  background: rgba(13, 17, 23, 0.7);
+  border: 1px solid #263746;
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.summary-chip span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.summary-chip strong {
+  display: block;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.summary-chip em {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+
+.kline-chart {
+  height: 520px;
+  width: 100%;
+  min-height: 360px;
+  border: 1px solid #1f2d3a;
+  border-radius: 8px;
+  background: #0b1118;
+  overflow: hidden;
+}
+
+.kline-note {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.kline-note code {
+  color: var(--soft);
+}
+
+.fallback-candles .wick {
+  stroke-width: 1.2;
+}
+
+.fallback-candles .candle {
+  rx: 1.5;
 }
 
 .chart.small {
@@ -592,6 +706,7 @@ td {
   }
 
   .metric-grid,
+  .market-summary,
   .chart-layout,
   .split-layout,
   .holdings-grid,
@@ -617,12 +732,17 @@ td {
   }
 
   .topbar,
-  .control-row {
+  .control-row,
+  .market-head,
+  .market-controls {
     align-items: stretch;
     flex-direction: column;
   }
 
-  select {
+  select,
+  input,
+  .field-label input,
+  .field-label select {
     min-width: 0;
     width: 100%;
   }
@@ -644,5 +764,9 @@ td {
 
   .chart {
     height: 340px;
+  }
+
+  .kline-chart {
+    height: 420px;
   }
 }
