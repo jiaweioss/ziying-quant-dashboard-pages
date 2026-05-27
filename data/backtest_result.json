@@ -1,0 +1,421 @@
+{
+  "meta": {
+    "generated_at": "2026-05-27T19:44:50",
+    "data_source": "ashare API http://43.103.51.239/ashare",
+    "db_path": "data/database/ashare_smoke.sqlite",
+    "start": "20240101",
+    "end": "20240131",
+    "initial_cash": 1000000.0,
+    "holding_count": 50,
+    "max_weight_per_stock": 0.05,
+    "rebalance_frequency": "weekly",
+    "n_universe_stocks": 4885,
+    "n_trading_days": 22,
+    "strategy_id": "hs300_multifactor",
+    "strategy_name": "价格+流动性多因子（等权选股，单票封顶）",
+    "strategy_description": "在沪深主板剔除 ST 后，按价格 + 流动性多因子合成分排序，月度调仓。权重生成走 portfolio 层等权 + 单票封顶，执行走 SimulatedBroker。",
+    "exec_layer": "src.execution.SimulatedBroker",
+    "risk_layer": "src.risk.enforce_position_limits",
+    "notes": [
+      "Returns use adjusted close (close * adj_factor); split/dividend safe.",
+      "Universe: SH+SZ common stocks, excluding names containing 'ST'.",
+      "Backtest performed on a single strategy; benchmarks are equal-weight + buy-hold."
+    ]
+  },
+  "metrics": {
+    "total_return": -0.203603,
+    "annualised_return": -0.926297,
+    "sharpe_ratio": -9.8626,
+    "max_drawdown": 0.203688,
+    "calmar_ratio": -4.5476,
+    "win_rate": 0.2857,
+    "avg_turnover_pct": 134.5096,
+    "excess_return_vs_eq_weight": null,
+    "excess_return_vs_buy_hold": null,
+    "benchmark_eq_weight": {
+      "total_return": null,
+      "sharpe_ratio": null,
+      "max_drawdown": 0.0
+    },
+    "benchmark_buy_hold": {
+      "total_return": null,
+      "sharpe_ratio": null,
+      "max_drawdown": null
+    }
+  },
+  "equity_curve": [
+    {
+      "date": "20240102",
+      "strategy_nav": 1000000.0,
+      "eq_weight_nav": 1000000.0,
+      "buy_hold_nav": null,
+      "drawdown": 0.0
+    },
+    {
+      "date": "20240103",
+      "strategy_nav": 1000107.41,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.0
+    },
+    {
+      "date": "20240104",
+      "strategy_nav": 996254.81,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.003852
+    },
+    {
+      "date": "20240105",
+      "strategy_nav": 984672.98,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.015433
+    },
+    {
+      "date": "20240108",
+      "strategy_nav": 964062.54,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.036041
+    },
+    {
+      "date": "20240109",
+      "strategy_nav": 970531.62,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.029573
+    },
+    {
+      "date": "20240110",
+      "strategy_nav": 954729.51,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.045373
+    },
+    {
+      "date": "20240111",
+      "strategy_nav": 959656.84,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.040446
+    },
+    {
+      "date": "20240112",
+      "strategy_nav": 937431.09,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.06267
+    },
+    {
+      "date": "20240115",
+      "strategy_nav": 944797.41,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.055304
+    },
+    {
+      "date": "20240116",
+      "strategy_nav": 938201.58,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.061899
+    },
+    {
+      "date": "20240117",
+      "strategy_nav": 906676.96,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.09342
+    },
+    {
+      "date": "20240118",
+      "strategy_nav": 904643.48,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.095454
+    },
+    {
+      "date": "20240119",
+      "strategy_nav": 865510.59,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.134582
+    },
+    {
+      "date": "20240122",
+      "strategy_nav": 846733.63,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.153357
+    },
+    {
+      "date": "20240123",
+      "strategy_nav": 845719.99,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.154371
+    },
+    {
+      "date": "20240124",
+      "strategy_nav": 858396.25,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.141696
+    },
+    {
+      "date": "20240125",
+      "strategy_nav": 871373.95,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.12872
+    },
+    {
+      "date": "20240126",
+      "strategy_nav": 863754.23,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.136339
+    },
+    {
+      "date": "20240129",
+      "strategy_nav": 823186.71,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.176902
+    },
+    {
+      "date": "20240130",
+      "strategy_nav": 808329.87,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.191757
+    },
+    {
+      "date": "20240131",
+      "strategy_nav": 796397.26,
+      "eq_weight_nav": null,
+      "buy_hold_nav": null,
+      "drawdown": 0.203688
+    }
+  ],
+  "yearly_returns": [
+    {
+      "year": "2024",
+      "strategy": -0.203603,
+      "eq_weight": null,
+      "buy_hold": null
+    }
+  ],
+  "latest_holdings": [
+    {
+      "ts_code": "002423.SZ",
+      "name": "中粮资本",
+      "value": 17792.94,
+      "weight": 0.026114
+    },
+    {
+      "ts_code": "600629.SH",
+      "name": "华建集团",
+      "value": 17785.75,
+      "weight": 0.026103
+    },
+    {
+      "ts_code": "301516.SZ",
+      "name": "中远通",
+      "value": 17561.61,
+      "weight": 0.025774
+    },
+    {
+      "ts_code": "003816.SZ",
+      "name": "中国广核",
+      "value": 16873.33,
+      "weight": 0.024764
+    },
+    {
+      "ts_code": "000151.SZ",
+      "name": "中成股份",
+      "value": 16866.73,
+      "weight": 0.024754
+    },
+    {
+      "ts_code": "000928.SZ",
+      "name": "中钢国际",
+      "value": 16861.93,
+      "weight": 0.024747
+    },
+    {
+      "ts_code": "301058.SZ",
+      "name": "中粮科工",
+      "value": 16646.79,
+      "weight": 0.024431
+    },
+    {
+      "ts_code": "300788.SZ",
+      "name": "中信出版",
+      "value": 16639.0,
+      "weight": 0.02442
+    },
+    {
+      "ts_code": "000014.SZ",
+      "name": "沙河股份",
+      "value": 16573.3,
+      "weight": 0.024324
+    },
+    {
+      "ts_code": "601136.SH",
+      "name": "首创证券",
+      "value": 16528.01,
+      "weight": 0.024257
+    },
+    {
+      "ts_code": "002051.SZ",
+      "name": "中工国际",
+      "value": 16473.07,
+      "weight": 0.024176
+    },
+    {
+      "ts_code": "603970.SH",
+      "name": "中农立华",
+      "value": 16427.93,
+      "weight": 0.02411
+    },
+    {
+      "ts_code": "601898.SH",
+      "name": "中煤能源",
+      "value": 16395.82,
+      "weight": 0.024063
+    },
+    {
+      "ts_code": "603860.SH",
+      "name": "中公高科",
+      "value": 16351.77,
+      "weight": 0.023998
+    },
+    {
+      "ts_code": "688648.SH",
+      "name": "中邮科技",
+      "value": 16342.96,
+      "weight": 0.023986
+    },
+    {
+      "ts_code": "600390.SH",
+      "name": "五矿资本",
+      "value": 16327.62,
+      "weight": 0.023963
+    },
+    {
+      "ts_code": "600705.SH",
+      "name": "中航产融(退)",
+      "value": 16310.94,
+      "weight": 0.023939
+    },
+    {
+      "ts_code": "000617.SZ",
+      "name": "中油资本",
+      "value": 16245.85,
+      "weight": 0.023843
+    },
+    {
+      "ts_code": "600970.SH",
+      "name": "中材国际",
+      "value": 16225.07,
+      "weight": 0.023812
+    },
+    {
+      "ts_code": "601998.SH",
+      "name": "中信银行",
+      "value": 16218.41,
+      "weight": 0.023803
+    },
+    {
+      "ts_code": "600938.SH",
+      "name": "中国海油",
+      "value": 16201.91,
+      "weight": 0.023778
+    },
+    {
+      "ts_code": "600708.SH",
+      "name": "光明地产",
+      "value": 16166.6,
+      "weight": 0.023727
+    },
+    {
+      "ts_code": "601788.SH",
+      "name": "光大证券",
+      "value": 16125.36,
+      "weight": 0.023666
+    },
+    {
+      "ts_code": "601857.SH",
+      "name": "中国石油",
+      "value": 16089.61,
+      "weight": 0.023614
+    },
+    {
+      "ts_code": "601766.SH",
+      "name": "中国中车",
+      "value": 16081.81,
+      "weight": 0.023602
+    },
+    {
+      "ts_code": "600050.SH",
+      "name": "中国联通",
+      "value": 16060.0,
+      "weight": 0.02357
+    },
+    {
+      "ts_code": "601728.SH",
+      "name": "中国电信",
+      "value": 16054.91,
+      "weight": 0.023563
+    },
+    {
+      "ts_code": "002142.SZ",
+      "name": "宁波银行",
+      "value": 16047.23,
+      "weight": 0.023551
+    },
+    {
+      "ts_code": "601668.SH",
+      "name": "中国建筑",
+      "value": 16041.76,
+      "weight": 0.023543
+    },
+    {
+      "ts_code": "601669.SH",
+      "name": "中国电建",
+      "value": 16039.05,
+      "weight": 0.023539
+    }
+  ],
+  "risk_events": [
+    {
+      "type": "turnover_spike",
+      "value": 134.51,
+      "limit": 80.0
+    },
+    {
+      "type": "negative_sharpe",
+      "value": -9.863
+    }
+  ],
+  "config_snapshot": {
+    "strategy": {
+      "initial_cash": 1000000,
+      "holding_count": 50,
+      "rebalance_frequency": "weekly",
+      "max_weight_per_stock": 0.05,
+      "liquidity_pct_floor": 0.25
+    },
+    "cost": {
+      "commission_rate": 0.0003,
+      "min_commission": 5,
+      "stamp_tax_rate": 0.0005,
+      "slippage_rate": 0.0005
+    },
+    "risk": {
+      "max_single_stock_weight": 0.05
+    }
+  }
+}
