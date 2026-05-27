@@ -1,6 +1,8 @@
 const LEGACY_URL = "./data/strategy_lab_results.json";
 const REAL_URL = "./data/backtest_result.json";
 const DEPLOY_INFO_URL = "./deploy-info.json";
+const WORKBENCH_API_URL = "api/workbench";
+const WORKBENCH_STATIC_URL = "./data/workbench_manifest.json";
 const KLINE_API_URL = "api/kline";
 const KLINE_STATIC_URLS = {
   "1d": "./data/kline_000001_1d.json",
@@ -12,6 +14,21 @@ const KLINE_STATIC_URLS = {
 };
 const LIGHTWEIGHT_CHARTS_URL =
   "https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js";
+
+const PAGE_META = {
+  overview: ["Research Pipeline", "量化研究工作台"],
+  data: ["Data Console", "数据：原材料"],
+  factors: ["Factor Lab", "因子：表达信息"],
+  features: ["Feature Factory", "特征：标准化输入"],
+  models: ["Model Lab", "模型：预测"],
+  strategy: ["Strategy Desk", "策略：决策"],
+  portfolio: ["Portfolio Studio", "组合：仓位"],
+  execution: ["Execution Desk", "执行：落地"],
+  risk: ["Risk Console", "风控：刹车"],
+  backtest: ["Backtest Lab", "回测：定位问题"],
+  market: ["Market Terminal", "本地 A 股看盘"],
+  ops: ["Collaboration Ops", "接口、发布与路线"],
+};
 
 const colors = {
   multifactor: "#43d39e",
@@ -38,8 +55,10 @@ let state = {
   legacy: null,
   real: null,
   deploy: null,
+  workbench: null,
   strategies: [],
   selectedId: null,
+  activePage: "overview",
   kline: {
     payload: null,
     chart: null,
@@ -103,6 +122,27 @@ async function fetchJsonLoose(url) {
   if (!response.ok) return null;
   const text = await response.text();
   return parseLooseJson(text);
+}
+
+async function fetchFirstJson(urls) {
+  for (const url of urls) {
+    try {
+      const payload = await fetchJsonLoose(url);
+      if (payload) return payload;
+    } catch {
+      // Try the next source; local API is optional on GitHub Pages.
+    }
+  }
+  return null;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function normalizeDrawdown(value) {
@@ -267,6 +307,53 @@ function realStrategy() {
   return state.strategies.find((s) => s.badge === "Real Data");
 }
 
+function moduleById(id) {
+  return (state.workbench?.modules || []).find((module) => module.id === id);
+}
+
+function pageFromHash() {
+  const candidate = decodeURIComponent((window.location.hash || "#overview").slice(1));
+  return document.querySelector(`.page[data-page="${candidate}"]`) ? candidate : "overview";
+}
+
+function activatePage(pageId, options = {}) {
+  const target = document.querySelector(`.page[data-page="${pageId}"]`);
+  if (!target) return;
+  state.activePage = pageId;
+  document.querySelectorAll(".page").forEach((page) => {
+    page.classList.toggle("active", page === target);
+  });
+  document.querySelectorAll(".nav-item").forEach((item) => {
+    item.classList.toggle("active", item.dataset.page === pageId);
+  });
+  const module = moduleById(pageId);
+  const [eyebrow, title] = PAGE_META[pageId] || [module?.role || "Research OS", module?.title || "量化研究工作台"];
+  document.querySelector("#pageEyebrow").textContent = eyebrow;
+  document.querySelector("#pageTitle").textContent = title;
+  if (options.push && window.location.hash !== `#${pageId}`) {
+    window.history.pushState(null, "", `#${pageId}`);
+  } else if (!window.location.hash) {
+    window.history.replaceState(null, "", `#${pageId}`);
+  }
+  document.querySelector(".workspace")?.scrollTo({ top: 0, behavior: options.instant ? "auto" : "smooth" });
+  if (pageId === "market") {
+    window.setTimeout(renderKline, 80);
+  } else if (state.kline.chart) {
+    state.kline.chart.remove();
+    state.kline.chart = null;
+  }
+}
+
+function setupPageNavigation() {
+  document.querySelectorAll(".nav-item[data-page]").forEach((item) => {
+    item.addEventListener("click", (event) => {
+      event.preventDefault();
+      activatePage(item.dataset.page, { push: true });
+    });
+  });
+  window.addEventListener("hashchange", () => activatePage(pageFromHash(), { instant: true }));
+}
+
 function renderSelect() {
   const select = document.querySelector("#strategySelect");
   select.innerHTML = state.strategies
@@ -310,7 +397,7 @@ function renderMetricGrid() {
       tone: riskEvents.length ? "amber" : "green",
     },
   ];
-  document.querySelector("#overview").innerHTML = cards
+  document.querySelector("#overviewMetrics").innerHTML = cards
     .map(
       (card) => `
       <article class="metric-card tone-${card.tone}">
@@ -549,6 +636,222 @@ function renderRiskEvents() {
     : `<div class="empty-state">真实管线样本未产生风控事件</div>`;
 }
 
+function maturityTone(value) {
+  if (value >= 0.65) return "green";
+  if (value >= 0.45) return "cyan";
+  if (value >= 0.32) return "amber";
+  return "rose";
+}
+
+function listItems(items, klass = "chip") {
+  return (items || []).map((item) => `<span class="${klass}">${escapeHtml(item)}</span>`).join("");
+}
+
+function renderModuleDetail(module) {
+  const percent = Math.round(finite(module.maturity) * 100);
+  const tone = maturityTone(finite(module.maturity));
+  const interfaceRows = (module.interfaces || [])
+    .map(
+      (contract) => `<div class="contract-spec">
+        <strong>${escapeHtml(contract.name)}</strong>
+        <code>${(contract.fields || []).map(escapeHtml).join(" · ")}</code>
+      </div>`
+    )
+    .join("");
+  return `
+    <section class="module-hero tone-${tone}">
+      <div>
+        <p class="eyebrow">${String(module.order).padStart(2, "0")} · ${escapeHtml(module.role)}</p>
+        <h2>${escapeHtml(module.title)}：${escapeHtml(module.subtitle)}</h2>
+        <p>${escapeHtml(module.summary)}</p>
+      </div>
+      <div class="maturity-meter" style="--maturity:${percent}%">
+        <span>${percent}%</span>
+        <em>${escapeHtml(module.status)}</em>
+      </div>
+    </section>
+    <section class="module-grid">
+      <div class="panel">
+        <div class="panel-head compact"><div><p class="eyebrow">Input</p><h2>输入</h2></div></div>
+        <div class="chip-cloud">${listItems(module.inputs)}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-head compact"><div><p class="eyebrow">Output</p><h2>输出</h2></div></div>
+        <div class="chip-cloud">${listItems(module.outputs, "chip output")}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-head compact"><div><p class="eyebrow">Controls</p><h2>成熟控制项</h2></div></div>
+        <div class="check-list">${(module.controls || []).map((item) => `<div>✓ ${escapeHtml(item)}</div>`).join("")}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-head compact"><div><p class="eyebrow">Current Code</p><h2>当前实现</h2></div></div>
+        <div class="file-list">${(module.current_files || []).map((file) => `<code>${escapeHtml(file)}</code>`).join("")}</div>
+      </div>
+      <div class="panel wide">
+        <div class="panel-head compact"><div><p class="eyebrow">Interface</p><h2>接口契约</h2></div></div>
+        <div class="contract-spec-list">${interfaceRows}</div>
+      </div>
+      <div class="panel wide">
+        <div class="panel-head compact"><div><p class="eyebrow">Next Iteration</p><h2>下一步要补</h2></div></div>
+        <div class="gap-list">${(module.gaps || []).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+        <div class="next-list">${(module.next || []).map((item) => `<div>${escapeHtml(item)}</div>`).join("")}</div>
+      </div>
+    </section>`;
+}
+
+function renderWorkbenchPages() {
+  (state.workbench?.modules || []).forEach((module) => {
+    const container = document.querySelector(`#module-${module.id}`);
+    if (container) container.innerHTML = renderModuleDetail(module);
+  });
+}
+
+function renderPipelineMap() {
+  const modules = state.workbench?.modules || [];
+  const interfaces = state.workbench?.interfaces || [];
+  const byId = Object.fromEntries(modules.map((module) => [module.id, module]));
+  document.querySelector("#pipelineMap").innerHTML = interfaces
+    .map((edge, index) => {
+      const from = byId[edge.from];
+      const to = byId[edge.to];
+      return `<button class="pipeline-step" type="button" data-page="${escapeHtml(edge.to)}">
+        <span>${String(index + 1).padStart(2, "0")}</span>
+        <strong>${escapeHtml(from?.title || edge.from)} → ${escapeHtml(to?.title || edge.to)}</strong>
+        <em>${escapeHtml(edge.artifact)}</em>
+      </button>`;
+    })
+    .join("");
+  document.querySelectorAll(".pipeline-step").forEach((button) => {
+    button.addEventListener("click", () => activatePage(button.dataset.page, { push: true }));
+  });
+}
+
+function renderIterationBoard() {
+  const modules = (state.workbench?.modules || []).slice().sort((a, b) => finite(a.maturity) - finite(b.maturity));
+  document.querySelector("#iterationBoard").innerHTML = modules
+    .slice(0, 5)
+    .map(
+      (module) => `<button class="iteration-item" type="button" data-page="${escapeHtml(module.id)}">
+        <span>${escapeHtml(module.title)} · ${Math.round(finite(module.maturity) * 100)}%</span>
+        <strong>${escapeHtml((module.next || [])[0] || module.summary)}</strong>
+        <em>${escapeHtml((module.gaps || []).slice(0, 3).join(" / "))}</em>
+      </button>`
+    )
+    .join("");
+  document.querySelectorAll(".iteration-item").forEach((button) => {
+    button.addEventListener("click", () => activatePage(button.dataset.page, { push: true }));
+  });
+}
+
+function renderModuleCards() {
+  const modules = state.workbench?.modules || [];
+  document.querySelector("#moduleCards").innerHTML = modules
+    .map((module) => {
+      const percent = Math.round(finite(module.maturity) * 100);
+      return `<button class="module-card" type="button" data-page="${escapeHtml(module.id)}">
+        <span>${String(module.order).padStart(2, "0")} · ${escapeHtml(module.role)}</span>
+        <strong>${escapeHtml(module.title)}</strong>
+        <em>${escapeHtml(module.status)}</em>
+        <i><b style="width:${percent}%"></b></i>
+      </button>`;
+    })
+    .join("");
+  document.querySelectorAll(".module-card").forEach((button) => {
+    button.addEventListener("click", () => activatePage(button.dataset.page, { push: true }));
+  });
+}
+
+function renderFeatureFactory() {
+  const items = [
+    ["去极值", "winsorize", "降低极端值对截面排序的冲击"],
+    ["标准化", "z-score", "把动量、成交额、波动率变成可比较分数"],
+    ["缺失处理", "missing policy", "区分真实缺失、上市不足和停牌缺失"],
+    ["中性化", "industry / size neutral", "下一步要加入行业和市值暴露控制"],
+    ["泄露检查", "point-in-time", "所有标签必须来自未来，所有特征只能来自当时"],
+  ];
+  document.querySelector("#featureFactory").innerHTML = items
+    .map(
+      ([title, key, note]) => `<div class="factory-item">
+        <span>${key}</span>
+        <strong>${title}</strong>
+        <em>${note}</em>
+      </div>`
+    )
+    .join("");
+}
+
+function renderModelQueue() {
+  const weights = state.legacy?.adaptive_factor_weights || [];
+  const lastWeight = weights.at(-1) || {};
+  const candidates = [
+    ["Rolling IC", "已接入", `最近权重：动量 ${fmtPct(lastWeight.momentum)} / 价值 ${fmtPct(lastWeight.value)} / 低波 ${fmtPct(lastWeight.low_vol)}`],
+    ["LightGBM 横截面收益", "下一批", "用 feature_matrix 预测未来 5/20 日收益，展示特征重要性和样本外 IC"],
+    ["XGBoost 排名模型", "候选", "把股票排序转成 pairwise/listwise 目标，和传统 IC 权重对照"],
+    ["组合约束优化", "联动", "模型预测不直接下单，先交给组合层做换手和风险约束"],
+  ];
+  document.querySelector("#modelQueue").innerHTML = candidates
+    .map(
+      ([title, status, note]) => `<div class="factory-item">
+        <span>${status}</span>
+        <strong>${title}</strong>
+        <em>${note}</em>
+      </div>`
+    )
+    .join("");
+}
+
+function renderExecutionLedger() {
+  const items = [
+    ["手续费", "src/backtest/cost.py", "买卖双边成本已抽象，后续要按券商费率和最低收费建模"],
+    ["滑点", "SimulatedBroker", "当前是轻量假设，下一步接成交额和波动率估算冲击"],
+    ["坏价格拒单", "stale_zero_or_nan_price", "已有测试覆盖 NaN/坏价格拒单"],
+    ["涨跌停/停牌", "待接入", "这是实盘逼真度的关键缺口"],
+  ];
+  document.querySelector("#executionLedger").innerHTML = items
+    .map(
+      ([title, status, note]) => `<div class="factory-item">
+        <span>${status}</span>
+        <strong>${title}</strong>
+        <em>${note}</em>
+      </div>`
+    )
+    .join("");
+}
+
+function renderBacktestDiagnostics() {
+  const best = historicalBest();
+  const real = realStrategy();
+  const rows = [
+    ["历史最佳", best?.name || "-", best ? fmtPct(best.metrics.total_return, { signed: true }) : "-"],
+    ["新框架收益", real?.name || "-", real ? fmtPct(real.metrics.total_return, { signed: true }) : "-"],
+    ["最大回撤", currentStrategy()?.name || "-", fmtPct(currentStrategy()?.metrics?.max_drawdown)],
+    ["问题定位", "优先看成本、换手、样本外和约束真实性", `${(state.real?.risk_events || []).length} 个风险事件`],
+  ];
+  document.querySelector("#backtestDiagnostics").innerHTML = rows
+    .map(
+      ([label, note, value]) => `<div class="diagnostic-item">
+        <span>${label}</span>
+        <strong>${value}</strong>
+        <em>${note}</em>
+      </div>`
+    )
+    .join("");
+}
+
+function renderInterfaceChain() {
+  const modules = state.workbench?.modules || [];
+  const byId = Object.fromEntries(modules.map((module) => [module.id, module]));
+  document.querySelector("#interfaceChain").innerHTML = (state.workbench?.interfaces || [])
+    .map(
+      (edge) => `<div class="interface-row">
+        <span>${escapeHtml(byId[edge.from]?.title || edge.from)}</span>
+        <strong>${escapeHtml(edge.artifact)}</strong>
+        <span>${escapeHtml(byId[edge.to]?.title || edge.to)}</span>
+      </div>`
+    )
+    .join("");
+}
+
 function fmtVolume(value) {
   if (!isFiniteNumber(value)) return "-";
   const number = Number(value);
@@ -767,16 +1070,11 @@ function setupKlineControls() {
 }
 
 function renderLayerFlow() {
-  const layers = [
-    ["Data", "ashare API / SQLite", "字段标准化、复权价格、ST 过滤"],
-    ["Market", "local K-line API", "日线 CSV、分钟 ZIP、Pages 样例兜底"],
-    ["Features", "price + liquidity factors", "截面去极值、Z-score、复合分"],
-    ["Strategy", "HS300 multifactor", "排序选股、流动性过滤、持仓上限"],
-    ["Portfolio", "weighting", "等权 / 分数权重 / 单票封顶"],
-    ["Execution", "SimulatedBroker", "成本、滑点、坏价格拒单"],
-    ["Risk", "RiskAgent", "回撤、换手、负夏普扫描"],
-    ["Publish", "static dashboard", "私有研究仓库 + 公开 Pages"],
-  ];
+  const layers = (state.workbench?.modules || []).map((module) => [
+    module.title,
+    module.owner,
+    `${module.role} · ${module.outputs?.[0] || module.status}`,
+  ]);
   document.querySelector("#layerFlow").innerHTML = layers
     .map(
       ([key, title, note], index) => `<div class="layer-row">
@@ -796,6 +1094,7 @@ function renderContracts() {
   const contracts = [
     ["Ashare API", "公开无 token", "http://43.103.51.239/ashare"],
     ["Local K-line", "本地优先", "/api/kline?symbol=000001.SZ&interval=1d"],
+    ["Workbench", state.workbench ? "已读取" : "缺失", "/api/workbench + data/workbench_manifest.json"],
     ["Python Client", "daily/data envelope", "AshareAPI.daily()"],
     ["Backtest JSON", real ? "已读取" : "缺失", "dashboard/data/backtest_result.json"],
     ["Legacy Lab JSON", state.legacy ? "已读取" : "缺失", "dashboard/data/strategy_lab_results.json"],
@@ -873,15 +1172,24 @@ function renderDeployInfo() {
 }
 
 function renderAll() {
+  renderWorkbenchPages();
   renderMetricGrid();
   renderCommandStrip();
+  renderPipelineMap();
+  renderIterationBoard();
+  renderModuleCards();
   renderEquityChart();
   renderSelectedDetail();
   renderDrawdownChart();
   renderYearlyChart();
   renderStrategyTable();
+  renderFeatureFactory();
+  renderModelQueue();
+  renderExecutionLedger();
+  renderBacktestDiagnostics();
   renderLayerFlow();
   renderContracts();
+  renderInterfaceChain();
   renderHoldings();
   renderRiskEvents();
   renderWeightsHeatmap();
@@ -890,14 +1198,16 @@ function renderAll() {
 }
 
 async function boot() {
-  const [legacy, real, deploy] = await Promise.all([
+  const [legacy, real, deploy, workbench] = await Promise.all([
     fetchJsonLoose(LEGACY_URL).catch(() => null),
     fetchJsonLoose(REAL_URL).catch(() => null),
     fetchJsonLoose(DEPLOY_INFO_URL).catch(() => null),
+    fetchFirstJson([WORKBENCH_API_URL, WORKBENCH_STATIC_URL]).catch(() => null),
   ]);
   state.legacy = legacy;
   state.real = real;
   state.deploy = deploy;
+  state.workbench = workbench;
   const legacyStrategies = (legacy?.strategies || []).map(normalizeLegacyStrategy);
   const realStrategies = normalizeRealPayload(real);
   state.strategies = [...legacyStrategies, ...realStrategies];
@@ -906,10 +1216,11 @@ async function boot() {
     return;
   }
   state.selectedId = historicalBest()?.id || state.strategies[0].id;
+  setupPageNavigation();
   renderSelect();
   renderAll();
   setupKlineControls();
-  renderKline();
+  activatePage(pageFromHash(), { instant: true });
 }
 
 boot().catch((error) => {

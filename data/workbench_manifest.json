@@ -1,0 +1,603 @@
+{
+  "version": "0.2.0",
+  "generated_at": "2026-05-27T16:48:49.392511+00:00",
+  "principle": "数据负责可信，因子负责表达信息，模型负责预测，策略负责决策，组合负责仓位，执行负责落地，风控负责刹车，回测负责定位问题。",
+  "modules": [
+    {
+      "id": "data",
+      "order": 1,
+      "title": "数据",
+      "subtitle": "把市场整理成可比较的表",
+      "role": "原材料",
+      "summary": "统一日线、分钟线、ashare API 与本地缓存，输出干净、可复现、无未来函数的行情和元数据。",
+      "maturity": 0.58,
+      "status": "可研究",
+      "owner": "src.data",
+      "inputs": [
+        "本地日线 CSV",
+        "分钟线 ZIP",
+        "ashare HTTP API",
+        "AkShare/Tushare 采集器"
+      ],
+      "outputs": [
+        "clean_daily_bars",
+        "local_kline_bars",
+        "symbol_universe",
+        "quality_report"
+      ],
+      "current_files": [
+        "src/data/ashare_api.py",
+        "src/data/ashare_loader.py",
+        "src/data/local_kline.py",
+        "src/data/database.py",
+        "src/data/quality.py"
+      ],
+      "controls": [
+        "字段标准化",
+        "复权因子",
+        "交易日排序",
+        "缺失值扫描",
+        "本地/静态数据降级"
+      ],
+      "gaps": [
+        "停牌日历",
+        "涨跌停可交易性",
+        "行业分类历史",
+        "财务/估值点时数据",
+        "指数成分历史"
+      ],
+      "interfaces": [
+        {
+          "name": "DailyBar",
+          "fields": [
+            "symbol",
+            "trade_date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume_hand",
+            "amount_k",
+            "adj_factor"
+          ]
+        },
+        {
+          "name": "KlineBar",
+          "fields": [
+            "time",
+            "date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "amount"
+          ]
+        }
+      ],
+      "next": [
+        "补齐停牌/涨跌停约束",
+        "建立行业和指数成分快照",
+        "为分钟线建立按 symbol/date 的索引缓存"
+      ]
+    },
+    {
+      "id": "factors",
+      "order": 2,
+      "title": "因子",
+      "subtitle": "表达为什么一只股票可能更好",
+      "role": "表达信息",
+      "summary": "从行情和基础数据中提取可解释信号，让每只股票每天得到一组原始打分。",
+      "maturity": 0.46,
+      "status": "初具雏形",
+      "owner": "src.features",
+      "inputs": [
+        "clean_daily_bars",
+        "symbol_universe"
+      ],
+      "outputs": [
+        "raw_factor_panel",
+        "factor_coverage",
+        "factor_ic_series"
+      ],
+      "current_files": [
+        "src/features/price_factors.py",
+        "src/features/liquidity_factors.py",
+        "src/features/ic_analysis.py",
+        "src/features/combine_factors.py"
+      ],
+      "controls": [
+        "窗口参数",
+        "方向定义",
+        "覆盖率",
+        "IC/RankIC",
+        "相关性"
+      ],
+      "gaps": [
+        "价值因子",
+        "质量因子",
+        "成长因子",
+        "分析师/预期因子",
+        "行业内排序"
+      ],
+      "interfaces": [
+        {
+          "name": "FactorPanel",
+          "fields": [
+            "date",
+            "symbol",
+            "factor_name",
+            "raw_value",
+            "direction",
+            "coverage"
+          ]
+        }
+      ],
+      "next": [
+        "增加估值与财务质量因子",
+        "做因子相关性裁剪",
+        "按行业/市值桶展示 IC 稳定性"
+      ]
+    },
+    {
+      "id": "features",
+      "order": 3,
+      "title": "特征",
+      "subtitle": "把因子整理成模型和策略可比较的输入",
+      "role": "标准化输入",
+      "summary": "完成去极值、标准化、缺失处理、方向统一和中性化，避免把不可比的量纲直接相加。",
+      "maturity": 0.34,
+      "status": "待拆层",
+      "owner": "src.features",
+      "inputs": [
+        "raw_factor_panel",
+        "industry_map",
+        "market_cap"
+      ],
+      "outputs": [
+        "feature_matrix",
+        "feature_metadata",
+        "neutralized_scores"
+      ],
+      "current_files": [
+        "src/features/combine_factors.py",
+        "src/models/rolling_ic.py"
+      ],
+      "controls": [
+        "winsorize",
+        "z-score",
+        "missing policy",
+        "factor direction",
+        "neutralization"
+      ],
+      "gaps": [
+        "特征注册表",
+        "训练/预测切分",
+        "行业中性",
+        "市值中性",
+        "泄露检查"
+      ],
+      "interfaces": [
+        {
+          "name": "FeatureMatrix",
+          "fields": [
+            "date",
+            "symbol",
+            "feature_*",
+            "composite_score",
+            "is_trainable"
+          ]
+        }
+      ],
+      "next": [
+        "将因子和特征工程拆开",
+        "增加行业/市值中性化开关",
+        "记录每轮特征配置 hash"
+      ]
+    },
+    {
+      "id": "models",
+      "order": 4,
+      "title": "模型",
+      "subtitle": "学习哪些打分在当前市场更有用",
+      "role": "预测",
+      "summary": "用滚动 IC 或机器学习模型把特征转成未来收益预测、排名或买入概率。",
+      "maturity": 0.31,
+      "status": "轻量基线",
+      "owner": "src.models",
+      "inputs": [
+        "feature_matrix",
+        "forward_return_labels"
+      ],
+      "outputs": [
+        "prediction_panel",
+        "factor_weights",
+        "model_diagnostics"
+      ],
+      "current_files": [
+        "src/models/rolling_ic.py",
+        "src/models/registry.py"
+      ],
+      "controls": [
+        "训练窗口",
+        "预测窗口",
+        "样本外切分",
+        "IC/IR",
+        "特征重要性"
+      ],
+      "gaps": [
+        "LightGBM/XGBoost",
+        "walk-forward 训练",
+        "模型版本管理",
+        "预测校准",
+        "样本外报告"
+      ],
+      "interfaces": [
+        {
+          "name": "PredictionPanel",
+          "fields": [
+            "date",
+            "symbol",
+            "predicted_return",
+            "rank",
+            "model_id",
+            "train_window"
+          ]
+        }
+      ],
+      "next": [
+        "引入 LightGBM 横截面收益预测",
+        "展示滚动 IC/IR 和特征重要性",
+        "保存每次训练配置"
+      ]
+    },
+    {
+      "id": "strategy",
+      "order": 5,
+      "title": "策略",
+      "subtitle": "把预测和规则变成交易意图",
+      "role": "决策",
+      "summary": "决定买什么、什么时候换、保留哪些旧持仓，并把分数转成目标股票列表。",
+      "maturity": 0.48,
+      "status": "研究可跑",
+      "owner": "src.strategies",
+      "inputs": [
+        "prediction_panel",
+        "feature_matrix",
+        "risk_constraints"
+      ],
+      "outputs": [
+        "target_selection",
+        "rebalance_plan"
+      ],
+      "current_files": [
+        "src/strategies/hs300_factor_strategy.py",
+        "src/strategies/rebalance.py"
+      ],
+      "controls": [
+        "股票池",
+        "Top N",
+        "分数阈值",
+        "调仓频率",
+        "保留旧持仓"
+      ],
+      "gaps": [
+        "样本外参数锁定",
+        "换仓门槛",
+        "容量估计",
+        "行业暴露",
+        "组合优化联动"
+      ],
+      "interfaces": [
+        {
+          "name": "TargetSelection",
+          "fields": [
+            "date",
+            "symbol",
+            "score",
+            "rank",
+            "reason",
+            "target_inclusion"
+          ]
+        }
+      ],
+      "next": [
+        "增加换仓缓冲区",
+        "展示每只股票入选理由",
+        "把策略参数变成可复现实验配置"
+      ]
+    },
+    {
+      "id": "portfolio",
+      "order": 6,
+      "title": "组合",
+      "subtitle": "把名单变成仓位",
+      "role": "仓位",
+      "summary": "在单票上限、现金、行业约束和换手限制下，把目标股票映射成目标权重。",
+      "maturity": 0.4,
+      "status": "基础仓位",
+      "owner": "src.portfolio",
+      "inputs": [
+        "target_selection",
+        "current_positions",
+        "risk_budget"
+      ],
+      "outputs": [
+        "target_weights",
+        "weight_diff",
+        "portfolio_exposure"
+      ],
+      "current_files": [
+        "src/portfolio/weighting.py"
+      ],
+      "controls": [
+        "等权",
+        "分数加权",
+        "单票上限",
+        "现金比例",
+        "换手惩罚"
+      ],
+      "gaps": [
+        "行业上限",
+        "市值暴露",
+        "风险预算",
+        "交易冲击约束",
+        "优化器"
+      ],
+      "interfaces": [
+        {
+          "name": "TargetWeights",
+          "fields": [
+            "date",
+            "symbol",
+            "target_weight",
+            "current_weight",
+            "delta_weight"
+          ]
+        }
+      ],
+      "next": [
+        "加入换手惩罚组合优化",
+        "展示行业/市值暴露",
+        "生成调仓前后权重差异"
+      ]
+    },
+    {
+      "id": "execution",
+      "order": 7,
+      "title": "执行",
+      "subtitle": "把仓位差异落成订单和成交",
+      "role": "落地",
+      "summary": "模拟或实盘执行订单，处理手续费、滑点、印花税、涨跌停、停牌和坏价格拒单。",
+      "maturity": 0.37,
+      "status": "模拟执行",
+      "owner": "src.execution",
+      "inputs": [
+        "target_weights",
+        "market_snapshot",
+        "cash"
+      ],
+      "outputs": [
+        "orders",
+        "fills",
+        "cash_ledger",
+        "rejects"
+      ],
+      "current_files": [
+        "src/execution/broker.py",
+        "src/backtest/cost.py"
+      ],
+      "controls": [
+        "手续费",
+        "滑点",
+        "印花税",
+        "成交价",
+        "最小交易单位",
+        "拒单原因"
+      ],
+      "gaps": [
+        "涨停买不进",
+        "跌停卖不出",
+        "停牌无法交易",
+        "冲击成本",
+        "实盘券商适配"
+      ],
+      "interfaces": [
+        {
+          "name": "OrderFill",
+          "fields": [
+            "date",
+            "symbol",
+            "side",
+            "shares",
+            "price",
+            "fee",
+            "status",
+            "reason"
+          ]
+        }
+      ],
+      "next": [
+        "把涨跌停/停牌接入 broker",
+        "增加成交明细页",
+        "估算成交冲击和容量"
+      ]
+    },
+    {
+      "id": "risk",
+      "order": 8,
+      "title": "风控",
+      "subtitle": "该刹车时刹车",
+      "role": "刹车",
+      "summary": "监控回撤、换手、集中度、负夏普、行业暴露和异常数据，阻止不可承受的组合进入执行。",
+      "maturity": 0.42,
+      "status": "风险扫描",
+      "owner": "src.risk",
+      "inputs": [
+        "portfolio_exposure",
+        "equity_curve",
+        "orders",
+        "fills"
+      ],
+      "outputs": [
+        "risk_events",
+        "limit_breaches",
+        "risk_adjusted_plan"
+      ],
+      "current_files": [
+        "src/risk/limits.py",
+        "src/agents/risk_agent.py"
+      ],
+      "controls": [
+        "最大回撤",
+        "换手上限",
+        "单票集中度",
+        "行业集中度",
+        "负夏普扫描"
+      ],
+      "gaps": [
+        "实时熔断",
+        "组合 beta",
+        "行业暴露",
+        "黑名单",
+        "风险预算联动"
+      ],
+      "interfaces": [
+        {
+          "name": "RiskEvent",
+          "fields": [
+            "date",
+            "type",
+            "value",
+            "limit",
+            "severity",
+            "action"
+          ]
+        }
+      ],
+      "next": [
+        "把风险事件接入策略调参建议",
+        "增加行业/风格暴露图",
+        "引入回撤止损模拟"
+      ]
+    },
+    {
+      "id": "backtest",
+      "order": 9,
+      "title": "回测",
+      "subtitle": "把想法放回历史里定位问题",
+      "role": "验证",
+      "summary": "只用当时已知信息复盘策略，拆解收益、回撤、成本、换手、年份稳定性和基准超额。",
+      "maturity": 0.52,
+      "status": "可比较",
+      "owner": "src.backtest",
+      "inputs": [
+        "target_weights",
+        "orders",
+        "fills",
+        "benchmark_series"
+      ],
+      "outputs": [
+        "equity_curve",
+        "metrics",
+        "yearly_returns",
+        "diagnostics"
+      ],
+      "current_files": [
+        "src/backtest/engine.py",
+        "src/backtest/metrics.py",
+        "src/report/backtest_report.py"
+      ],
+      "controls": [
+        "初始资金",
+        "交易成本",
+        "调仓频率",
+        "基准",
+        "样本窗口"
+      ],
+      "gaps": [
+        "样本外验证",
+        "归因分析",
+        "成交明细",
+        "参数网格",
+        "自动实验追踪"
+      ],
+      "interfaces": [
+        {
+          "name": "BacktestResult",
+          "fields": [
+            "meta",
+            "metrics",
+            "equity_curve",
+            "yearly_returns",
+            "latest_holdings",
+            "risk_events"
+          ]
+        }
+      ],
+      "next": [
+        "把每次实验注册到 run ledger",
+        "展示成本前后收益",
+        "增加样本内/样本外切换"
+      ]
+    }
+  ],
+  "interfaces": [
+    {
+      "from": "data",
+      "to": "factors",
+      "artifact": "clean_daily_bars"
+    },
+    {
+      "from": "factors",
+      "to": "features",
+      "artifact": "raw_factor_panel"
+    },
+    {
+      "from": "features",
+      "to": "models",
+      "artifact": "feature_matrix"
+    },
+    {
+      "from": "models",
+      "to": "strategy",
+      "artifact": "prediction_panel"
+    },
+    {
+      "from": "strategy",
+      "to": "portfolio",
+      "artifact": "target_selection"
+    },
+    {
+      "from": "portfolio",
+      "to": "execution",
+      "artifact": "target_weights"
+    },
+    {
+      "from": "execution",
+      "to": "risk",
+      "artifact": "orders/fills"
+    },
+    {
+      "from": "risk",
+      "to": "backtest",
+      "artifact": "risk_events"
+    },
+    {
+      "from": "backtest",
+      "to": "models",
+      "artifact": "diagnostics"
+    }
+  ],
+  "console_pages": [
+    "data",
+    "factors",
+    "features",
+    "models",
+    "strategy",
+    "portfolio",
+    "execution",
+    "risk",
+    "backtest"
+  ]
+}

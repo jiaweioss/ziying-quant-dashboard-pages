@@ -1,6 +1,14 @@
 # Dashboard
 
-静态量化研究看板，展示历史 Strategy Lab、最新真实数据回测、框架链路、风控事件、持仓、滚动 IC 权重和发布状态。
+量化研究工作台，展示历史 Strategy Lab、最新真实数据回测、K 线看盘、框架链路、模块接口、风控事件、持仓、滚动 IC 权重和发布状态。
+
+前端按流水线拆成独立页面：
+
+```text
+数据 -> 因子 -> 特征 -> 模型 -> 策略 -> 组合 -> 执行 -> 风控 -> 回测
+```
+
+每个页面都围绕同一份 `workbench_manifest` 渲染输入、输出、当前代码、控制项、缺口和下一步计划，避免 UI 和后端框架描述分叉。
 
 ## 数据文件
 
@@ -8,6 +16,7 @@
 data/strategy_lab_results.json  # 历史 7 策略对比，当前历史最佳来自这里
 data/backtest_result.json       # src.main real-backtest 输出的新框架结果
 data/kline_000001_*.json        # GitHub Pages 看盘兜底样例，来自本地日线/分钟线
+data/workbench_manifest.json    # 研究工作台模块、接口、成熟度和下一步计划
 deploy-info.json                # Pages 发布时自动生成，本地预览可缺省
 ```
 
@@ -34,6 +43,7 @@ deploy-info.json                # Pages 发布时自动生成，本地预览可�
 本地预览会优先请求：
 
 ```text
+/api/workbench
 /api/kline?symbol=000001.SZ&interval=1d&limit=260
 /api/kline?symbol=000001.SZ&interval=1m&limit=320
 ```

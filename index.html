@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>自营量化 · Research Command Center</title>
+    <title>自营量化 · Research OS</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -17,13 +17,21 @@
           </div>
         </div>
 
-        <nav class="nav-stack" aria-label="Dashboard sections">
-          <a href="#overview" class="nav-item active">概览</a>
-          <a href="#market" class="nav-item">看盘</a>
-          <a href="#performance" class="nav-item">绩效</a>
-          <a href="#pipeline" class="nav-item">框架</a>
-          <a href="#risk" class="nav-item">风控</a>
-          <a href="#roadmap" class="nav-item">路线</a>
+        <nav class="nav-stack" aria-label="Research console pages">
+          <a href="#overview" class="nav-item active" data-page="overview">总览</a>
+          <div class="nav-group-label">研究流水线</div>
+          <a href="#data" class="nav-item" data-page="data">数据</a>
+          <a href="#factors" class="nav-item" data-page="factors">因子</a>
+          <a href="#features" class="nav-item" data-page="features">特征</a>
+          <a href="#models" class="nav-item" data-page="models">模型</a>
+          <a href="#strategy" class="nav-item" data-page="strategy">策略</a>
+          <a href="#portfolio" class="nav-item" data-page="portfolio">组合</a>
+          <a href="#execution" class="nav-item" data-page="execution">执行</a>
+          <a href="#risk" class="nav-item" data-page="risk">风控</a>
+          <div class="nav-group-label">验证与工具</div>
+          <a href="#backtest" class="nav-item" data-page="backtest">回测</a>
+          <a href="#market" class="nav-item" data-page="market">看盘</a>
+          <a href="#ops" class="nav-item" data-page="ops">协作</a>
         </nav>
 
         <div class="status-stack">
@@ -47,181 +55,293 @@
       <main class="workspace">
         <header class="topbar">
           <div>
-            <p class="eyebrow">A 股日线 · 多因子研究 · 真实数据管线</p>
-            <h1>量化策略回测驾驶舱</h1>
+            <p id="pageEyebrow" class="eyebrow">Research Pipeline · 控制台</p>
+            <h1 id="pageTitle">量化研究工作台</h1>
           </div>
           <div class="control-row">
-            <label class="select-label" for="strategySelect">当前视图</label>
+            <label class="select-label" for="strategySelect">当前策略</label>
             <select id="strategySelect"></select>
           </div>
         </header>
 
-        <section id="overview" class="metric-grid" aria-label="Key metrics"></section>
-
-        <section class="command-strip" aria-label="System status">
-          <div class="strip-item">
-            <span class="strip-key">历史最佳</span>
-            <strong id="bestLine">--</strong>
-          </div>
-          <div class="strip-item">
-            <span class="strip-key">新框架回测</span>
-            <strong id="realLine">--</strong>
-          </div>
-          <div class="strip-item">
-            <span class="strip-key">收益差距</span>
-            <strong id="gapLine">--</strong>
-          </div>
-          <div class="strip-item">
-            <span class="strip-key">数据窗口</span>
-            <strong id="windowLine">--</strong>
-          </div>
-        </section>
-
-        <section id="market" class="panel market-panel">
-          <div class="panel-head market-head">
-            <div>
-              <p class="eyebrow">Market Terminal</p>
-              <h2>本地 A 股 K 线看盘</h2>
-            </div>
-            <div class="market-controls">
-              <label class="field-label" for="klineSymbol">
-                <span>股票</span>
-                <input id="klineSymbol" value="000001.SZ" inputmode="latin" />
-              </label>
-              <label class="field-label" for="klineInterval">
-                <span>周期</span>
-                <select id="klineInterval">
-                  <option value="1d">日线</option>
-                  <option value="60m">60 分钟</option>
-                  <option value="30m">30 分钟</option>
-                  <option value="15m">15 分钟</option>
-                  <option value="5m">5 分钟</option>
-                  <option value="1m">1 分钟</option>
-                </select>
-              </label>
-              <button id="klineRefresh" class="refresh-button" type="button">刷新</button>
-            </div>
-          </div>
-          <div id="klineSummary" class="market-summary"></div>
-          <div id="klineChart" class="kline-chart" aria-label="K line chart"></div>
-          <div class="kline-note">
-            本地预览优先读取 <code>/api/kline</code>，GitHub Pages 自动降级为仓库样例数据；字段已统一为 Lightweight Charts 的 <code>time/open/high/low/close/volume</code>。
-          </div>
-        </section>
-
-        <section id="performance" class="chart-layout">
-          <div class="panel equity-panel">
-            <div class="panel-head">
-              <div>
-                <p class="eyebrow">Equity Curve</p>
-                <h2>策略净值与新框架对照</h2>
+        <div class="page-stack">
+          <section id="overview" class="page active" data-page="overview">
+            <div id="overviewMetrics" class="metric-grid" aria-label="Key metrics"></div>
+            <section class="command-strip" aria-label="System status">
+              <div class="strip-item">
+                <span class="strip-key">历史最佳</span>
+                <strong id="bestLine">--</strong>
               </div>
-              <div class="legend" id="equityLegend"></div>
-            </div>
-            <div id="equityChart" class="chart"></div>
-          </div>
-          <div class="panel detail-panel">
-            <div class="panel-head compact">
-              <div>
-                <p class="eyebrow">Selected</p>
-                <h2 id="selectedName">策略详情</h2>
+              <div class="strip-item">
+                <span class="strip-key">新框架回测</span>
+                <strong id="realLine">--</strong>
               </div>
-              <span id="selectedBadge" class="source-badge">--</span>
-            </div>
-            <p id="selectedDescription" class="strategy-description"></p>
-            <div id="detailMetrics" class="detail-metrics"></div>
-          </div>
-        </section>
+              <div class="strip-item">
+                <span class="strip-key">收益差距</span>
+                <strong id="gapLine">--</strong>
+              </div>
+              <div class="strip-item">
+                <span class="strip-key">数据窗口</span>
+                <strong id="windowLine">--</strong>
+              </div>
+            </section>
+            <section class="pipeline-console">
+              <div class="panel">
+                <div class="panel-head compact">
+                  <div>
+                    <p class="eyebrow">Pipeline</p>
+                    <h2>从数据到回测的接口链路</h2>
+                  </div>
+                </div>
+                <div id="pipelineMap" class="pipeline-map"></div>
+              </div>
+              <div class="panel">
+                <div class="panel-head compact">
+                  <div>
+                    <p class="eyebrow">Iteration Board</p>
+                    <h2>下一轮迭代优先级</h2>
+                  </div>
+                </div>
+                <div id="iterationBoard" class="iteration-board"></div>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Modules</p>
+                  <h2>模块成熟度雷达</h2>
+                </div>
+              </div>
+              <div id="moduleCards" class="module-card-grid"></div>
+            </section>
+          </section>
 
-        <section class="split-layout">
-          <div class="panel">
-            <div class="panel-head">
-              <div>
-                <p class="eyebrow">Drawdown</p>
-                <h2>回撤轨迹</h2>
+          <section id="data" class="page module-page" data-page="data">
+            <div id="module-data"></div>
+          </section>
+          <section id="factors" class="page module-page" data-page="factors">
+            <div id="module-factors"></div>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Factor Weights</p>
+                  <h2>滚动 IC 权重热力图</h2>
+                </div>
               </div>
-            </div>
-            <div id="drawdownChart" class="chart small"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-head">
-              <div>
-                <p class="eyebrow">Calendar</p>
-                <h2>年度收益</h2>
+              <div id="weightsHeatmap" class="heatmap"></div>
+            </section>
+          </section>
+          <section id="features" class="page module-page" data-page="features">
+            <div id="module-features"></div>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Feature Factory</p>
+                  <h2>特征工程控制台</h2>
+                </div>
               </div>
-            </div>
-            <div id="yearlyChart" class="chart small"></div>
-          </div>
-        </section>
+              <div id="featureFactory" class="factory-grid"></div>
+            </section>
+          </section>
+          <section id="models" class="page module-page" data-page="models">
+            <div id="module-models"></div>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Model Lab</p>
+                  <h2>模型候选队列</h2>
+                </div>
+              </div>
+              <div id="modelQueue" class="factory-grid"></div>
+            </section>
+          </section>
+          <section id="strategy" class="page module-page" data-page="strategy">
+            <div id="module-strategy"></div>
+            <section class="chart-layout">
+              <div class="panel detail-panel">
+                <div class="panel-head compact">
+                  <div>
+                    <p class="eyebrow">Selected Strategy</p>
+                    <h2 id="selectedName">策略详情</h2>
+                  </div>
+                  <span id="selectedBadge" class="source-badge">--</span>
+                </div>
+                <p id="selectedDescription" class="strategy-description"></p>
+                <div id="detailMetrics" class="detail-metrics"></div>
+              </div>
+              <div class="panel">
+                <div class="panel-head compact">
+                  <div>
+                    <p class="eyebrow">Strategy Matrix</p>
+                    <h2>策略表现矩阵</h2>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <table id="strategyTable"></table>
+                </div>
+              </div>
+            </section>
+          </section>
+          <section id="portfolio" class="page module-page" data-page="portfolio">
+            <div id="module-portfolio"></div>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Portfolio</p>
+                  <h2>最近一期持仓</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table id="holdingsTable"></table>
+              </div>
+            </section>
+          </section>
+          <section id="execution" class="page module-page" data-page="execution">
+            <div id="module-execution"></div>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Execution Ledger</p>
+                  <h2>交易假设与落地约束</h2>
+                </div>
+              </div>
+              <div id="executionLedger" class="factory-grid"></div>
+            </section>
+          </section>
+          <section id="risk" class="page module-page" data-page="risk">
+            <div id="module-risk"></div>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Risk Events</p>
+                  <h2>真实管线风控扫描</h2>
+                </div>
+              </div>
+              <div id="riskEvents" class="event-list"></div>
+            </section>
+          </section>
 
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Strategy Matrix</p>
-              <h2>策略表现矩阵</h2>
-            </div>
-          </div>
-          <div class="table-wrap">
-            <table id="strategyTable"></table>
-          </div>
-        </section>
+          <section id="backtest" class="page" data-page="backtest">
+            <div id="module-backtest"></div>
+            <section id="performance" class="chart-layout">
+              <div class="panel equity-panel">
+                <div class="panel-head">
+                  <div>
+                    <p class="eyebrow">Equity Curve</p>
+                    <h2>策略净值与新框架对照</h2>
+                  </div>
+                  <div class="legend" id="equityLegend"></div>
+                </div>
+                <div id="equityChart" class="chart"></div>
+              </div>
+              <div class="panel">
+                <div class="panel-head compact">
+                  <div>
+                    <p class="eyebrow">Backtest Contract</p>
+                    <h2>验证目标与问题定位</h2>
+                  </div>
+                </div>
+                <div id="backtestDiagnostics" class="diagnostic-grid"></div>
+              </div>
+            </section>
+            <section class="split-layout">
+              <div class="panel">
+                <div class="panel-head compact">
+                  <div>
+                    <p class="eyebrow">Drawdown</p>
+                    <h2>回撤轨迹</h2>
+                  </div>
+                </div>
+                <div id="drawdownChart" class="chart small"></div>
+              </div>
+              <div class="panel">
+                <div class="panel-head compact">
+                  <div>
+                    <p class="eyebrow">Calendar</p>
+                    <h2>年度收益</h2>
+                  </div>
+                </div>
+                <div id="yearlyChart" class="chart small"></div>
+              </div>
+            </section>
+          </section>
 
-        <section id="pipeline" class="pipeline-grid">
-          <div class="panel">
-            <div class="panel-head compact">
-              <div>
-                <p class="eyebrow">Architecture</p>
-                <h2>最新框架链路</h2>
+          <section id="market" class="page" data-page="market">
+            <section class="panel market-panel">
+              <div class="panel-head market-head">
+                <div>
+                  <p class="eyebrow">Market Terminal</p>
+                  <h2>本地 A 股 K 线看盘</h2>
+                </div>
+                <div class="market-controls">
+                  <label class="field-label" for="klineSymbol">
+                    <span>股票</span>
+                    <input id="klineSymbol" value="000001.SZ" inputmode="latin" />
+                  </label>
+                  <label class="field-label" for="klineInterval">
+                    <span>周期</span>
+                    <select id="klineInterval">
+                      <option value="1d">日线</option>
+                      <option value="60m">60 分钟</option>
+                      <option value="30m">30 分钟</option>
+                      <option value="15m">15 分钟</option>
+                      <option value="5m">5 分钟</option>
+                      <option value="1m">1 分钟</option>
+                    </select>
+                  </label>
+                  <button id="klineRefresh" class="refresh-button" type="button">刷新</button>
+                </div>
               </div>
-            </div>
-            <div id="layerFlow" class="layer-flow"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-head compact">
-              <div>
-                <p class="eyebrow">Contracts</p>
-                <h2>接口与发布状态</h2>
+              <div id="klineSummary" class="market-summary"></div>
+              <div id="klineChart" class="kline-chart" aria-label="K line chart"></div>
+              <div class="kline-note">
+                本地预览优先读取 <code>/api/kline</code>，GitHub Pages 自动降级为仓库样例数据；字段已统一为 Lightweight Charts 的
+                <code>time/open/high/low/close/volume</code>。
               </div>
-            </div>
-            <div id="contractList" class="contract-list"></div>
-          </div>
-        </section>
+            </section>
+          </section>
 
-        <section id="risk" class="holdings-grid">
-          <div class="panel">
-            <div class="panel-head compact">
-              <div>
-                <p class="eyebrow">Portfolio</p>
-                <h2>最近一期持仓</h2>
+          <section id="ops" class="page" data-page="ops">
+            <section class="pipeline-grid">
+              <div class="panel">
+                <div class="panel-head compact">
+                  <div>
+                    <p class="eyebrow">Architecture</p>
+                    <h2>最新框架链路</h2>
+                  </div>
+                </div>
+                <div id="layerFlow" class="layer-flow"></div>
               </div>
-            </div>
-            <div class="table-wrap">
-              <table id="holdingsTable"></table>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-head compact">
-              <div>
-                <p class="eyebrow">Risk Events</p>
-                <h2>真实管线风控扫描</h2>
+              <div class="panel">
+                <div class="panel-head compact">
+                  <div>
+                    <p class="eyebrow">Contracts</p>
+                    <h2>接口与发布状态</h2>
+                  </div>
+                </div>
+                <div id="contractList" class="contract-list"></div>
               </div>
-            </div>
-            <div id="riskEvents" class="event-list"></div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Training</p>
-              <h2>滚动 IC 权重与建设路线</h2>
-            </div>
-          </div>
-          <div class="model-roadmap">
-            <div id="weightsHeatmap" class="heatmap"></div>
-            <div id="roadmap" class="roadmap-grid"></div>
-          </div>
-        </section>
+            </section>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Interface Chain</p>
+                  <h2>模块间接口契约</h2>
+                </div>
+              </div>
+              <div id="interfaceChain" class="interface-chain"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Roadmap</p>
+                  <h2>滚动建设路线</h2>
+                </div>
+              </div>
+              <div id="roadmap" class="roadmap-grid"></div>
+            </section>
+          </section>
+        </div>
       </main>
     </div>
     <script src="./app.js"></script>

@@ -1,6 +1,6 @@
 ﻿{
     "source_repo":  "jiaweioss/ziying-quant-tool",
-    "source_sha":  "a50e67dcf9ba1fa8ecda86cd997689afd7c931ff",
-    "deployed_at":  "2026-05-27T16:30:12.0889181Z",
-    "note":  "Manual dashboard sync with local K-line samples"
+    "source_sha":  "d2b0474aaf49277f0125a64b36e0d5abb3cab8a3",
+    "deployed_at":  "2026-05-27T16:59:59.0516715Z",
+    "note":  "Manual dashboard sync with Research OS workbench"
 }
