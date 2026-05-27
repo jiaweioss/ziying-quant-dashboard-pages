@@ -271,9 +271,13 @@
               <div class="panel-head market-head">
                 <div>
                   <p class="eyebrow">Market Terminal</p>
-                  <h2>本地 A 股 K 线看盘</h2>
+                  <h2>A 股行情看盘</h2>
                 </div>
                 <div class="market-controls">
+                  <div class="mode-toggle" aria-label="看盘数据源">
+                    <button id="marketModeExternal" class="mode-button active" type="button">外部行情</button>
+                    <button id="marketModeLocal" class="mode-button" type="button">本地K线</button>
+                  </div>
                   <label class="field-label" for="klineSymbol">
                     <span>股票</span>
                     <input id="klineSymbol" value="000001.SZ" inputmode="latin" />
@@ -293,10 +297,10 @@
                 </div>
               </div>
               <div id="klineSummary" class="market-summary"></div>
-              <div id="klineChart" class="kline-chart" aria-label="K line chart"></div>
+              <div id="externalMarketWidget" class="external-market-widget" aria-label="External market widget"></div>
+              <div id="klineChart" class="kline-chart hidden" aria-label="K line chart"></div>
               <div class="kline-note">
-                本地预览优先读取 <code>/api/kline</code>，GitHub Pages 自动降级为仓库样例数据；字段已统一为 Lightweight Charts 的
-                <code>time/open/high/low/close/volume</code>。
+                服务器默认使用 TradingView 外部行情组件，不占用磁盘；切换到本地K线时优先读取 <code>/api/kline</code>，没有本地数据则降级为样例 JSON。
               </div>
             </section>
           </section>

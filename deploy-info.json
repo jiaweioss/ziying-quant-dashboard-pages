@@ -1,6 +1,6 @@
 ﻿{
     "source_repo":  "jiaweioss/ziying-quant-tool",
-    "source_sha":  "d2b0474aaf49277f0125a64b36e0d5abb3cab8a3",
-    "deployed_at":  "2026-05-27T16:59:59.0516715Z",
-    "note":  "Manual dashboard sync with Research OS workbench"
+    "source_sha":  "5df3fb706802e28bf9856a971bbd072a8c1d91ba",
+    "deployed_at":  "2026-05-27T17:28:09.1296068Z",
+    "note":  "Manual dashboard sync with external market widget"
 }

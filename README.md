@@ -24,7 +24,9 @@ deploy-info.json                # Pages 发布时自动生成，本地预览可�
 
 ## 本地 K 线看盘
 
-前端使用 TradingView Lightweight Charts 展示 K 线和成交量。数据统一为：
+看盘页默认使用 TradingView 外部行情组件展示 A 股行情，不需要把大体量日线/分钟线复制到服务器。输入 `000001.SZ` 会映射为 `SZSE:000001`，输入 `600000.SH` 会映射为 `SSE:600000`。
+
+切换到“本地K线”时，前端使用 TradingView Lightweight Charts 展示 K 线和成交量。数据统一为：
 
 ```json
 {

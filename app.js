@@ -14,6 +14,7 @@ const KLINE_STATIC_URLS = {
 };
 const LIGHTWEIGHT_CHARTS_URL =
   "https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js";
+const TRADINGVIEW_WIDGET_URL = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
 
 const PAGE_META = {
   overview: ["Research Pipeline", "量化研究工作台"],
@@ -26,7 +27,7 @@ const PAGE_META = {
   execution: ["Execution Desk", "执行：落地"],
   risk: ["Risk Console", "风控：刹车"],
   backtest: ["Backtest Lab", "回测：定位问题"],
-  market: ["Market Terminal", "本地 A 股看盘"],
+  market: ["Market Terminal", "A 股行情看盘"],
   ops: ["Collaboration Ops", "接口、发布与路线"],
 };
 
@@ -64,6 +65,10 @@ let state = {
     chart: null,
     controlsReady: false,
     scriptReady: null,
+  },
+  market: {
+    mode: "external",
+    widgetKey: null,
   },
 };
 
@@ -337,7 +342,7 @@ function activatePage(pageId, options = {}) {
   }
   document.querySelector(".workspace")?.scrollTo({ top: 0, behavior: options.instant ? "auto" : "smooth" });
   if (pageId === "market") {
-    window.setTimeout(renderKline, 80);
+    window.setTimeout(renderMarket, 80);
   } else if (state.kline.chart) {
     state.kline.chart.remove();
     state.kline.chart = null;
@@ -937,6 +942,106 @@ function renderKlineSummary(payload) {
     : `<div class="empty-state">暂无 K 线数据</div>`;
 }
 
+function normalizeMarketSymbol(symbol) {
+  const raw = String(symbol || "000001.SZ").trim().toUpperCase();
+  if (/^\d{6}\.(SH|SS)$/i.test(raw)) return `SSE:${raw.slice(0, 6)}`;
+  if (/^\d{6}\.SZ$/i.test(raw)) return `SZSE:${raw.slice(0, 6)}`;
+  if (/^SH\d{6}$/i.test(raw)) return `SSE:${raw.slice(2)}`;
+  if (/^SZ\d{6}$/i.test(raw)) return `SZSE:${raw.slice(2)}`;
+  if (/^\d{6}$/.test(raw)) return raw.startsWith("6") ? `SSE:${raw}` : `SZSE:${raw}`;
+  if (raw.includes(":")) return raw;
+  return "SZSE:000001";
+}
+
+function tradingViewInterval(interval) {
+  return {
+    "1d": "D",
+    "60m": "60",
+    "30m": "30",
+    "15m": "15",
+    "5m": "5",
+    "1m": "1",
+  }[interval] || "D";
+}
+
+function setMarketMode(mode) {
+  state.market.mode = mode;
+  document.querySelector("#marketModeExternal")?.classList.toggle("active", mode === "external");
+  document.querySelector("#marketModeLocal")?.classList.toggle("active", mode === "local");
+  document.querySelector("#externalMarketWidget")?.classList.toggle("hidden", mode !== "external");
+  document.querySelector("#klineChart")?.classList.toggle("hidden", mode !== "local");
+}
+
+function renderExternalMarketSummary() {
+  const summary = document.querySelector("#klineSummary");
+  const symbol = document.querySelector("#klineSymbol")?.value?.trim() || "000001.SZ";
+  const interval = document.querySelector("#klineInterval")?.value || "1d";
+  const tvSymbol = normalizeMarketSymbol(symbol);
+  summary.innerHTML = [
+    ["标的", symbol.toUpperCase(), tvSymbol],
+    ["数据源", "TradingView", "外部嵌入组件"],
+    ["周期", interval, `widget interval ${tradingViewInterval(interval)}`],
+    ["部署模式", "轻量服务器", "不落盘行情数据"],
+    ["本地增强", "/api/kline", "有本地数据时可切换"],
+  ]
+    .map(
+      ([label, value, note]) => `<div class="summary-chip">
+        <span>${label}</span>
+        <strong>${value}</strong>
+        <em>${note}</em>
+      </div>`
+    )
+    .join("");
+}
+
+function renderExternalMarketWidget() {
+  const container = document.querySelector("#externalMarketWidget");
+  if (!container) return;
+  const symbol = document.querySelector("#klineSymbol")?.value?.trim() || "000001.SZ";
+  const interval = document.querySelector("#klineInterval")?.value || "1d";
+  const tvSymbol = normalizeMarketSymbol(symbol);
+  const widgetKey = `${tvSymbol}|${interval}`;
+  renderExternalMarketSummary();
+  if (state.market.widgetKey === widgetKey && container.querySelector("iframe")) return;
+  state.market.widgetKey = widgetKey;
+  container.innerHTML = "";
+  const script = document.createElement("script");
+  script.src = TRADINGVIEW_WIDGET_URL;
+  script.async = true;
+  script.textContent = JSON.stringify({
+    autosize: true,
+    symbol: tvSymbol,
+    interval: tradingViewInterval(interval),
+    timezone: "Asia/Shanghai",
+    theme: "dark",
+    style: "1",
+    locale: "zh_CN",
+    enable_publishing: false,
+    allow_symbol_change: true,
+    calendar: false,
+    support_host: "https://www.tradingview.com",
+    hide_side_toolbar: false,
+    details: true,
+    hotlist: true,
+    withdateranges: true,
+    studies: ["Volume@tv-basicstudies"],
+  });
+  container.appendChild(script);
+}
+
+function renderMarket() {
+  setMarketMode(state.market.mode);
+  if (state.market.mode === "external") {
+    if (state.kline.chart) {
+      state.kline.chart.remove();
+      state.kline.chart = null;
+    }
+    renderExternalMarketWidget();
+    return;
+  }
+  renderKline();
+}
+
 function renderKlineFallback(container, bars) {
   const width = 1200;
   const height = 520;
@@ -1056,10 +1161,20 @@ function setupKlineControls() {
   const refresh = document.querySelector("#klineRefresh");
   const symbol = document.querySelector("#klineSymbol");
   const interval = document.querySelector("#klineInterval");
-  refresh?.addEventListener("click", renderKline);
-  interval?.addEventListener("change", renderKline);
+  const external = document.querySelector("#marketModeExternal");
+  const local = document.querySelector("#marketModeLocal");
+  refresh?.addEventListener("click", renderMarket);
+  interval?.addEventListener("change", renderMarket);
   symbol?.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") renderKline();
+    if (event.key === "Enter") renderMarket();
+  });
+  external?.addEventListener("click", () => {
+    state.market.mode = "external";
+    renderMarket();
+  });
+  local?.addEventListener("click", () => {
+    state.market.mode = "local";
+    renderMarket();
   });
   window.addEventListener("resize", () => {
     if (!state.kline.chart) return;

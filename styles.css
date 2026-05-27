@@ -485,6 +485,31 @@ input:focus {
   gap: 10px;
 }
 
+.mode-toggle {
+  height: 42px;
+  padding: 3px;
+  background: #0d141d;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 3px;
+}
+
+.mode-button {
+  min-width: 84px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.mode-button.active {
+  color: var(--text);
+  background: #1d2b3a;
+}
+
 .field-label {
   display: grid;
   gap: 6px;
@@ -558,6 +583,26 @@ input:focus {
   border-radius: 8px;
   background: #0b1118;
   overflow: hidden;
+}
+
+.external-market-widget {
+  height: 620px;
+  width: 100%;
+  min-height: 420px;
+  border: 1px solid #1f2d3a;
+  border-radius: 8px;
+  background: #0b1118;
+  overflow: hidden;
+}
+
+.external-market-widget iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.hidden {
+  display: none !important;
 }
 
 .kline-note {
@@ -1103,5 +1148,9 @@ td {
 
   .kline-chart {
     height: 420px;
+  }
+
+  .external-market-widget {
+    height: 520px;
   }
 }
