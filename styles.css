@@ -1134,6 +1134,300 @@ td {
   font-size: 15px;
 }
 
+.blueprint-hero {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(67, 211, 158, 0.12), transparent 36%),
+    linear-gradient(315deg, rgba(244, 189, 80, 0.1), transparent 42%),
+    rgba(17, 24, 34, 0.96);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.62fr);
+  gap: 20px;
+  align-items: center;
+  box-shadow: var(--shadow);
+}
+
+.blueprint-hero h2 {
+  font-size: clamp(28px, 3.4vw, 48px);
+  line-height: 1.08;
+  margin: 8px 0 12px;
+}
+
+.blueprint-hero p:not(.eyebrow) {
+  color: var(--soft);
+  line-height: 1.75;
+  max-width: 940px;
+}
+
+.blueprint-hero-grid,
+.toolchain-grid,
+.surface-grid,
+.runbook-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.blueprint-hero-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.blueprint-stat,
+.tool-card,
+.phase-card,
+.surface-card,
+.artifact-row,
+.runbook-card {
+  border: 1px solid #2a3947;
+  border-radius: 8px;
+  background: rgba(13, 19, 27, 0.82);
+  min-width: 0;
+}
+
+.blueprint-stat {
+  padding: 14px;
+}
+
+.blueprint-stat span,
+.tool-card-head span,
+.phase-topline span,
+.artifact-row span,
+.surface-card span,
+.runbook-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.blueprint-stat strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 26px;
+  overflow-wrap: anywhere;
+}
+
+.blueprint-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.65fr);
+  gap: 18px;
+}
+
+.toolchain-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tool-card,
+.runbook-card {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.tool-card-head,
+.phase-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.tool-card-head em {
+  color: var(--green);
+  font-style: normal;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.tool-card strong,
+.surface-card strong,
+.runbook-card strong,
+.artifact-row strong,
+.phase-card strong {
+  display: block;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.tool-card p,
+.phase-card p {
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.source-link,
+.page-pill {
+  color: var(--cyan);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.source-link.muted {
+  color: var(--muted);
+}
+
+.page-pill {
+  border: 1px solid #33516a;
+  border-radius: 999px;
+  background: #0f1b26;
+  min-height: 28px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.chip-row,
+.artifact-tags,
+.done-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.artifact-tag,
+.surface-chip,
+.tag {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  border: 1px solid #304354;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.phase-rail {
+  display: grid;
+  gap: 10px;
+}
+
+.phase-card {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  padding: 12px;
+  gap: 12px;
+}
+
+.phase-index {
+  min-height: 58px;
+  border-radius: 8px;
+  border: 1px solid #345064;
+  display: grid;
+  place-items: center;
+  color: var(--green);
+  font-weight: 900;
+  background: #0d1721;
+}
+
+.phase-body {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.acceptance-list,
+.done-list {
+  display: grid;
+  gap: 6px;
+}
+
+.acceptance-list span,
+.done-list span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.acceptance-list span::before,
+.done-list span::before {
+  content: "✓";
+  color: var(--green);
+  margin-right: 6px;
+}
+
+.surface-card {
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.surface-card:hover,
+.page-pill:hover {
+  border-color: var(--cyan);
+  background: #142235;
+}
+
+.surface-card em {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-style: normal;
+}
+
+.artifact-matrix {
+  display: grid;
+  gap: 8px;
+}
+
+.artifact-row {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(160px, 0.7fr) minmax(0, 1.35fr) minmax(220px, 0.95fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.artifact-schema {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.artifact-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.artifact-flow b {
+  color: var(--green);
+}
+
+.runbook-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.runbook-card ol {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--soft);
+  line-height: 1.65;
+  font-size: 13px;
+}
+
+.status-now {
+  border-color: rgba(67, 211, 158, 0.36);
+}
+
+.status-next {
+  border-color: rgba(82, 183, 255, 0.36);
+}
+
+.status-design {
+  border-color: rgba(244, 189, 80, 0.4);
+}
+
+.status-later,
+.status-reference {
+  border-color: rgba(143, 160, 173, 0.32);
+}
+
 .empty-state {
   color: var(--muted);
   padding: 18px;
@@ -1185,8 +1479,12 @@ td {
   .holdings-grid,
   .pipeline-grid,
   .pipeline-console,
+  .blueprint-hero,
+  .blueprint-layout,
   .module-grid,
   .module-card-grid,
+  .toolchain-grid,
+  .runbook-grid,
   .pipeline-map,
   .factory-grid,
   .diagnostic-grid,
@@ -1237,8 +1535,11 @@ td {
   .metric-grid,
   .detail-metrics,
   .roadmap-grid,
+  .blueprint-hero-grid,
   .gap-list,
-  .interface-row {
+  .interface-row,
+  .artifact-row,
+  .artifact-flow {
     grid-template-columns: 1fr;
   }
 

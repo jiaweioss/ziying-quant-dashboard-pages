@@ -31,6 +31,7 @@
           <div class="nav-group-label">验证与工具</div>
           <a href="#backtest" class="nav-item" data-page="backtest">回测</a>
           <a href="#market" class="nav-item" data-page="market">看盘</a>
+          <a href="#blueprint" class="nav-item" data-page="blueprint">蓝图</a>
           <a href="#ops" class="nav-item" data-page="ops">协作</a>
         </nav>
 
@@ -320,6 +321,66 @@
               <div class="kline-note">
                 服务器默认使用 TradingView 外部行情组件，不占用磁盘；切换到本地K线时优先读取 <code>/api/kline</code>，没有本地数据则降级为样例 JSON。
               </div>
+            </section>
+          </section>
+
+          <section id="blueprint" class="page" data-page="blueprint">
+            <section class="blueprint-hero">
+              <div>
+                <p class="eyebrow">Company Control Console</p>
+                <h2>从研究想法到可复现交易系统</h2>
+                <p id="blueprintThesis">
+                  先把数据、因子、模型、策略、组合、执行和风控之间的接口做清楚，再把每一次研究变成可比较、可回放、可上线的流水线。
+                </p>
+              </div>
+              <div id="blueprintHero" class="blueprint-hero-grid" aria-label="Blueprint status"></div>
+            </section>
+            <section class="blueprint-layout">
+              <div class="panel">
+                <div class="panel-head compact">
+                  <div>
+                    <p class="eyebrow">Toolchain</p>
+                    <h2>成熟工具链选型</h2>
+                  </div>
+                </div>
+                <div id="toolchainGrid" class="toolchain-grid"></div>
+              </div>
+              <div class="panel">
+                <div class="panel-head compact">
+                  <div>
+                    <p class="eyebrow">Operator Surfaces</p>
+                    <h2>交易员核心操作台</h2>
+                  </div>
+                </div>
+                <div id="operatorSurfaces" class="surface-grid"></div>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Implementation Phases</p>
+                  <h2>下一步迭代路线</h2>
+                </div>
+              </div>
+              <div id="blueprintPhases" class="phase-rail"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Contracts</p>
+                  <h2>模块之间的接口产物</h2>
+                </div>
+              </div>
+              <div id="blueprintInterfaces" class="artifact-matrix"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head compact">
+                <div>
+                  <p class="eyebrow">Runbooks</p>
+                  <h2>研究团队标准动作</h2>
+                </div>
+              </div>
+              <div id="runbookGrid" class="runbook-grid"></div>
             </section>
           </section>
 

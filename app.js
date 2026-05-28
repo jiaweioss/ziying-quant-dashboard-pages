@@ -3,6 +3,8 @@ const REAL_URL = "./data/backtest_result.json";
 const DEPLOY_INFO_URL = "./deploy-info.json";
 const WORKBENCH_API_URL = "api/workbench";
 const WORKBENCH_STATIC_URL = "./data/workbench_manifest.json";
+const BLUEPRINT_API_URL = "api/blueprint";
+const BLUEPRINT_STATIC_URL = "./data/company_blueprint.json";
 const KLINE_API_URL = "api/kline";
 const KLINE_STATIC_URLS = {
   "1d": "./data/kline_000001_1d.json",
@@ -38,6 +40,7 @@ const PAGE_META = {
   risk: ["Risk Console", "风控：刹车"],
   backtest: ["Backtest Lab", "回测：定位问题"],
   market: ["Market Terminal", "A 股行情看盘"],
+  blueprint: ["Company Blueprint", "量化公司控制台蓝图"],
   ops: ["Collaboration Ops", "接口、发布与路线"],
 };
 
@@ -67,6 +70,7 @@ let state = {
   real: null,
   deploy: null,
   workbench: null,
+  blueprint: null,
   strategies: [],
   selectedId: null,
   activePage: "overview",
@@ -161,6 +165,22 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function renderTagList(items, klass = "tag") {
+  return (items || []).map((item) => `<span class="${klass}">${escapeHtml(item)}</span>`).join("");
+}
+
+function statusLabel(value) {
+  return (
+    {
+      now: "已接入",
+      next: "下一步",
+      design: "设计中",
+      reference: "参考框架",
+      later: "后续接入",
+    }[value] || value || "待定"
+  );
 }
 
 function normalizeDrawdown(value) {
@@ -870,6 +890,158 @@ function renderInterfaceChain() {
     .join("");
 }
 
+function bindBlueprintPageButtons() {
+  document.querySelectorAll("#blueprint [data-page]").forEach((button) => {
+    button.addEventListener("click", () => activatePage(button.dataset.page, { push: true }));
+  });
+}
+
+function referenceForTool(tool, references) {
+  const haystack = `${tool.id || ""} ${tool.name || ""} ${tool.why || ""}`.toLowerCase();
+  return (references || []).find((ref) => {
+    const key = String(ref.name || "").toLowerCase();
+    if (key.includes("qlib")) return haystack.includes("qlib");
+    if (key.includes("lean")) return haystack.includes("lean");
+    if (key.includes("mlflow")) return haystack.includes("mlflow");
+    if (key.includes("prefect")) return haystack.includes("prefect");
+    return false;
+  });
+}
+
+function renderBlueprintHero() {
+  const blueprint = state.blueprint || {};
+  const phases = blueprint.phases || [];
+  const current = phases.filter((phase) => ["next", "design"].includes(phase.status)).length;
+  const interfaces = blueprint.interface_artifacts || [];
+  const references = blueprint.references || [];
+  const thesis = blueprint.thesis || "把量化交易拆成稳定接口，再让每一次研究、回测、风控和发布都可复现。";
+  const hero = document.querySelector("#blueprintHero");
+  const thesisNode = document.querySelector("#blueprintThesis");
+  if (thesisNode) thesisNode.textContent = thesis;
+  if (!hero) return;
+  hero.innerHTML = [
+    ["蓝图版本", blueprint.version || "-"],
+    ["活跃阶段", `${current}/${phases.length || 0}`],
+    ["接口产物", interfaces.length],
+    ["参考框架", references.length],
+  ]
+    .map(
+      ([label, value]) => `<div class="blueprint-stat">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value)}</strong>
+      </div>`
+    )
+    .join("");
+}
+
+function renderToolchainGrid() {
+  const blueprint = state.blueprint || {};
+  const toolchain = blueprint.toolchain || [];
+  const refs = blueprint.references || [];
+  const el = document.querySelector("#toolchainGrid");
+  if (!el) return;
+  el.innerHTML = toolchain
+    .map((tool) => {
+      const ref = referenceForTool(tool, refs);
+      const source = ref
+        ? `<a class="source-link" href="${escapeHtml(ref.url)}" target="_blank" rel="noreferrer">${escapeHtml(ref.name)}</a>`
+        : `<span class="source-link muted">内部实现</span>`;
+      return `<div class="tool-card status-${escapeHtml(tool.status)}">
+        <div class="tool-card-head">
+          <span>${escapeHtml(tool.category)}</span>
+          <em>${escapeHtml(statusLabel(tool.status))}</em>
+        </div>
+        <strong>${escapeHtml(tool.name)}</strong>
+        <p>${escapeHtml(tool.why)}</p>
+        <div class="chip-row">${renderTagList(tool.next || [], "chip")}</div>
+        ${source}
+      </div>`;
+    })
+    .join("");
+}
+
+function renderBlueprintPhases() {
+  const phases = state.blueprint?.phases || [];
+  const el = document.querySelector("#blueprintPhases");
+  if (!el) return;
+  el.innerHTML = phases
+    .map(
+      (phase, index) => `<div class="phase-card status-${escapeHtml(phase.status)}">
+        <div class="phase-index">${String(index + 1).padStart(2, "0")}</div>
+        <div class="phase-body">
+          <div class="phase-topline">
+            <span>${escapeHtml(statusLabel(phase.status))}</span>
+            <button type="button" class="page-pill" data-page="${escapeHtml(phase.target_page)}">${escapeHtml(phase.target_page)}</button>
+          </div>
+          <strong>${escapeHtml(phase.title)}</strong>
+          <p>${escapeHtml(phase.goal)}</p>
+          <div class="artifact-tags">${renderTagList(phase.deliverables || [], "artifact-tag")}</div>
+          <div class="acceptance-list">${(phase.acceptance || []).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+        </div>
+      </div>`
+    )
+    .join("");
+  bindBlueprintPageButtons();
+}
+
+function renderOperatorSurfaces() {
+  const surfaces = state.blueprint?.operator_surfaces || [];
+  const el = document.querySelector("#operatorSurfaces");
+  if (!el) return;
+  el.innerHTML = surfaces
+    .map(
+      (surface) => `<button class="surface-card" type="button" data-page="${escapeHtml(surface.target_page)}">
+        <span>${escapeHtml(surface.priority)} · ${escapeHtml(surface.target_page)}</span>
+        <strong>${escapeHtml(surface.name)}</strong>
+        <em>${renderTagList(surface.widgets || [], "surface-chip")}</em>
+      </button>`
+    )
+    .join("");
+  bindBlueprintPageButtons();
+}
+
+function renderBlueprintInterfaces() {
+  const artifacts = state.blueprint?.interface_artifacts || [];
+  const el = document.querySelector("#blueprintInterfaces");
+  if (!el) return;
+  el.innerHTML = artifacts
+    .map(
+      (artifact) => `<div class="artifact-row">
+        <div>
+          <span>${escapeHtml(artifact.owner)}</span>
+          <strong>${escapeHtml(artifact.name)}</strong>
+        </div>
+        <div class="artifact-schema">${renderTagList(artifact.schema || [], "artifact-tag")}</div>
+        <div class="artifact-flow">
+          <span>${escapeHtml(artifact.producer)}</span>
+          <b>→</b>
+          <span>${escapeHtml(artifact.consumer)}</span>
+        </div>
+      </div>`
+    )
+    .join("");
+}
+
+function renderRunbooks() {
+  const runbooks = state.blueprint?.runbooks || [];
+  const el = document.querySelector("#runbookGrid");
+  if (!el) return;
+  el.innerHTML = runbooks
+    .map(
+      (book) => `<div class="runbook-card">
+        <div class="phase-topline">
+          <span>${escapeHtml(book.id)}</span>
+          <button type="button" class="page-pill" data-page="${escapeHtml(book.target_page)}">${escapeHtml(book.target_page)}</button>
+        </div>
+        <strong>${escapeHtml(book.title)}</strong>
+        <ol>${(book.steps || []).map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
+        <div class="done-list">${(book.done || []).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+      </div>`
+    )
+    .join("");
+  bindBlueprintPageButtons();
+}
+
 function fmtVolume(value) {
   if (!isFiniteNumber(value)) return "-";
   const number = Number(value);
@@ -1316,6 +1488,7 @@ function renderContracts() {
     ["Ashare API", "公开无 token", "http://43.103.51.239/ashare"],
     ["Local K-line", "本地优先", "/api/kline?symbol=000001.SZ&interval=1d"],
     ["Workbench", state.workbench ? "已读取" : "缺失", "/api/workbench + data/workbench_manifest.json"],
+    ["Blueprint", state.blueprint ? "已读取" : "缺失", "/api/blueprint + data/company_blueprint.json"],
     ["Python Client", "daily/data envelope", "AshareAPI.daily()"],
     ["Backtest JSON", real ? "已读取" : "缺失", "dashboard/data/backtest_result.json"],
     ["Legacy Lab JSON", state.legacy ? "已读取" : "缺失", "dashboard/data/strategy_lab_results.json"],
@@ -1411,6 +1584,12 @@ function renderAll() {
   renderLayerFlow();
   renderContracts();
   renderInterfaceChain();
+  renderBlueprintHero();
+  renderToolchainGrid();
+  renderBlueprintPhases();
+  renderOperatorSurfaces();
+  renderBlueprintInterfaces();
+  renderRunbooks();
   renderHoldings();
   renderRiskEvents();
   renderWeightsHeatmap();
@@ -1419,16 +1598,18 @@ function renderAll() {
 }
 
 async function boot() {
-  const [legacy, real, deploy, workbench] = await Promise.all([
+  const [legacy, real, deploy, workbench, blueprint] = await Promise.all([
     fetchJsonLoose(LEGACY_URL).catch(() => null),
     fetchJsonLoose(REAL_URL).catch(() => null),
     fetchJsonLoose(DEPLOY_INFO_URL).catch(() => null),
     fetchFirstJson([WORKBENCH_API_URL, WORKBENCH_STATIC_URL]).catch(() => null),
+    fetchFirstJson([BLUEPRINT_API_URL, BLUEPRINT_STATIC_URL]).catch(() => null),
   ]);
   state.legacy = legacy;
   state.real = real;
   state.deploy = deploy;
   state.workbench = workbench;
+  state.blueprint = blueprint;
   const legacyStrategies = (legacy?.strategies || []).map(normalizeLegacyStrategy);
   const realStrategies = normalizeRealPayload(real);
   state.strategies = [...legacyStrategies, ...realStrategies];

@@ -17,10 +17,24 @@ data/strategy_lab_results.json  # 历史 7 策略对比，当前历史最佳来�
 data/backtest_result.json       # src.main real-backtest 输出的新框架结果
 data/kline_000001_*.json        # GitHub Pages 看盘兜底样例，来自本地日线/分钟线
 data/workbench_manifest.json    # 研究工作台模块、接口、成熟度和下一步计划
+data/company_blueprint.json     # 公司级控制台蓝图、工具链、接口产物、runbook
 deploy-info.json                # Pages 发布时自动生成，本地预览可缺省
 ```
 
 `app.js` 会同时读取历史实验和新框架结果；如果新框架 JSON 里存在旧版本遗留的 `NaN`，前端会做兼容解析，但新的 `real-backtest` 输出已经使用 strict JSON。
+
+## 公司级蓝图页
+
+`#blueprint` 页面把 `ARCHITECTURE.md` 里的核心思路落成可视化控制台：工具链选型、阶段路线、交易员操作台、接口产物和标准 runbook 都来自同一份 `company_blueprint`。页面里的模块按钮会直接跳到对应的“数据/因子/模型/策略/组合/执行/风控/回测”页面，方便团队按流水线逐步补真实实现。
+
+当前借鉴方向：
+
+```text
+Qlib：研究闭环
+LEAN：事件驱动回测和执行边界
+MLflow：实验追踪与模型注册
+Prefect：任务编排和可观测性
+```
 
 ## 本地 K 线看盘
 
@@ -46,6 +60,7 @@ deploy-info.json                # Pages 发布时自动生成，本地预览可�
 
 ```text
 /api/workbench
+/api/blueprint
 /api/kline?symbol=000001.SZ&interval=1d&limit=260
 /api/kline?symbol=000001.SZ&interval=1m&limit=320
 ```

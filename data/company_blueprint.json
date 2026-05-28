@@ -1,0 +1,488 @@
+{
+  "version": "0.3.0",
+  "generated_at": "2026-05-28T00:00:38.035188+00:00",
+  "thesis": "先把架构边界做清楚，再把每次研究、回测、风控和发布变成可复现流水线。",
+  "references": [
+    {
+      "name": "Microsoft Qlib",
+      "url": "https://github.com/microsoft/qlib",
+      "role": "AI-oriented quant research workflow inspiration",
+      "adopt": "借鉴数据、特征、模型、组合和回测的研究闭环，不直接照搬数据格式。"
+    },
+    {
+      "name": "QuantConnect LEAN",
+      "url": "https://www.quantconnect.com/docs/v2/writing-algorithms/key-concepts/algorithm-engine",
+      "role": "event-driven backtest/live trading engine reference",
+      "adopt": "借鉴事件流、撮合、订单和实盘边界，早期先实现轻量模拟执行。"
+    },
+    {
+      "name": "MLflow Tracking",
+      "url": "https://mlflow.org/docs/latest/ml/tracking/",
+      "role": "experiment tracking and model registry reference",
+      "adopt": "记录策略配置、代码版本、指标、模型和产物，先用 JSON ledger，后续再接 MLflow。"
+    },
+    {
+      "name": "Prefect",
+      "url": "https://www.prefect.io/how-it-works",
+      "role": "workflow orchestration and observability reference",
+      "adopt": "定时数据质检、因子重算、回测队列和日报，先用本地脚本/systemd，后续接 Prefect。"
+    }
+  ],
+  "toolchain": [
+    {
+      "id": "ashare-contract",
+      "name": "Ashare + 内部 Schema",
+      "category": "Data",
+      "status": "now",
+      "why": "当前已有 ashare API 和本地 A 股数据，先统一字段、日期语义和质量报告。",
+      "next": [
+        "data/schemas.py",
+        "data/queries.py",
+        "data/quality.py"
+      ]
+    },
+    {
+      "id": "parquet-duckdb",
+      "name": "Parquet + DuckDB",
+      "category": "Storage",
+      "status": "next",
+      "why": "训练和回测需要列式读取，服务器不存全量大数据，本地或对象存储保存 Parquet 分区。",
+      "next": [
+        "按 frequency/symbol/year 分区",
+        "生成 data_version",
+        "本地缓存热数据"
+      ]
+    },
+    {
+      "id": "qlib-style",
+      "name": "Qlib-style Research Loop",
+      "category": "Research",
+      "status": "reference",
+      "why": "Qlib 的优势是把数据、特征、模型、组合和回测串成研究闭环，适合作为长期形态参考。",
+      "next": [
+        "FactorSpec",
+        "FeaturePipeline",
+        "ModelRegistry",
+        "ExperimentLedger"
+      ]
+    },
+    {
+      "id": "lean-style",
+      "name": "LEAN-style Event Engine",
+      "category": "Backtest/Execution",
+      "status": "reference",
+      "why": "LEAN 对研究、回测、实盘和订单事件边界非常成熟；我们先实现轻量事件循环。",
+      "next": [
+        "BacktestRequest",
+        "OrderFill",
+        "BrokerSimulator",
+        "RiskGate"
+      ]
+    },
+    {
+      "id": "mlflow",
+      "name": "MLflow Tracking",
+      "category": "MLOps",
+      "status": "later",
+      "why": "当 LightGBM/XGBoost 引入后，需要记录参数、指标、模型和数据集，避免实验不可复现。",
+      "next": [
+        "先落 JSON run ledger",
+        "再接 MLflow Tracking Server"
+      ]
+    },
+    {
+      "id": "prefect",
+      "name": "Prefect Orchestration",
+      "category": "Ops",
+      "status": "later",
+      "why": "当数据更新、因子重算、回测和日报变成定时任务后，需要可观察的任务编排。",
+      "next": [
+        "先 systemd/cron",
+        "后 Prefect flows"
+      ]
+    },
+    {
+      "id": "redis-websocket",
+      "name": "Redis + WebSocket",
+      "category": "Realtime",
+      "status": "later",
+      "why": "真正实时看盘和订单状态需要低延迟推送；当前外部行情足够做轻量展示。",
+      "next": [
+        "行情热缓存",
+        "风控事件推送",
+        "实验进度推送"
+      ]
+    },
+    {
+      "id": "fastapi",
+      "name": "FastAPI Gateway",
+      "category": "API",
+      "status": "next",
+      "why": "控制台后续需要统一查询策略、触发回测、读取实验和风控状态。",
+      "next": [
+        "/api/strategies",
+        "/api/runs",
+        "/api/risk",
+        "/api/artifacts"
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1-data-contract",
+      "title": "阶段 1：数据契约",
+      "status": "next",
+      "target_page": "data",
+      "goal": "只保留 ashare 作为正式入口，定义稳定 MarketData schema 和质量报告。",
+      "deliverables": [
+        "data/client.py",
+        "data/schemas.py",
+        "data/queries.py",
+        "data/quality.py"
+      ],
+      "acceptance": [
+        "统一字段输出",
+        "重复/缺失/异常价格可报警",
+        "synthetic 仅用于测试"
+      ]
+    },
+    {
+      "id": "p2-universe-features",
+      "title": "阶段 2：股票池、因子与特征拆层",
+      "status": "next",
+      "target_page": "factors",
+      "goal": "把查询过滤、投资筛选、原始因子、特征工程拆开。",
+      "deliverables": [
+        "universe/base.py",
+        "features/factors/*",
+        "features/engineering/*",
+        "features/pipelines/*"
+      ],
+      "acceptance": [
+        "FactorSpec 可注册",
+        "FeaturePipeline 可复现",
+        "行业/市值中性化有接口"
+      ]
+    },
+    {
+      "id": "p3-strategy-config",
+      "title": "阶段 3：策略配置化",
+      "status": "design",
+      "target_page": "strategy",
+      "goal": "策略变成 YAML 配置 + 少量逻辑，输出统一 signals 表。",
+      "deliverables": [
+        "config/strategies/*.yaml",
+        "strategies/schemas.py",
+        "strategies/loader.py"
+      ],
+      "acceptance": [
+        "strategy_id 可启动回测",
+        "配置可 diff",
+        "每次实验保存配置 hash"
+      ]
+    },
+    {
+      "id": "p4-backtest-ledger",
+      "title": "阶段 4：回测结果标准化",
+      "status": "design",
+      "target_page": "backtest",
+      "goal": "回测保存过程数据，不只保存最终收益。",
+      "deliverables": [
+        "backtest/result.py",
+        "orders.json",
+        "positions.json",
+        "risk_report.json"
+      ],
+      "acceptance": [
+        "无 NaN JSON",
+        "净值/回撤/持仓/订单可追溯",
+        "成本前后收益可比较"
+      ]
+    },
+    {
+      "id": "p5-experiment-loop",
+      "title": "阶段 5：研究闭环",
+      "status": "later",
+      "target_page": "models",
+      "goal": "多策略、多参数、多模型比较，沉淀实验结论和下一轮建议。",
+      "deliverables": [
+        "research/experiments",
+        "run_ledger.json",
+        "BacktestAnalysisAgent",
+        "StrategyTuningAgent"
+      ],
+      "acceptance": [
+        "可按指标筛 run",
+        "可比较配置差异",
+        "有样本外验证标记"
+      ]
+    }
+  ],
+  "operator_surfaces": [
+    {
+      "id": "strategy-command",
+      "name": "策略指挥台",
+      "priority": "P0",
+      "target_page": "strategy",
+      "widgets": [
+        "策略配置 diff",
+        "信号分布",
+        "Top/Bottom 股票",
+        "入选理由"
+      ]
+    },
+    {
+      "id": "risk-tower",
+      "name": "风控塔",
+      "priority": "P0",
+      "target_page": "risk",
+      "widgets": [
+        "数据风险",
+        "组合暴露",
+        "交易可行性",
+        "风险事件流"
+      ]
+    },
+    {
+      "id": "experiment-ledger",
+      "name": "实验账本",
+      "priority": "P0",
+      "target_page": "backtest",
+      "widgets": [
+        "run 列表",
+        "指标排行",
+        "样本外标记",
+        "产物下载"
+      ]
+    },
+    {
+      "id": "factor-monitor",
+      "name": "因子监控",
+      "priority": "P1",
+      "target_page": "factors",
+      "widgets": [
+        "IC/IR",
+        "分组收益",
+        "覆盖率",
+        "相关性热力图"
+      ]
+    },
+    {
+      "id": "model-registry",
+      "name": "模型注册台",
+      "priority": "P1",
+      "target_page": "models",
+      "widgets": [
+        "训练窗口",
+        "特征重要性",
+        "预测分布",
+        "模型版本"
+      ]
+    },
+    {
+      "id": "market-terminal",
+      "name": "行情终端",
+      "priority": "P1",
+      "target_page": "market",
+      "widgets": [
+        "分钟/小时/日线",
+        "全屏",
+        "外部行情",
+        "本地复盘"
+      ]
+    }
+  ],
+  "interface_artifacts": [
+    {
+      "name": "MarketData",
+      "owner": "data",
+      "schema": [
+        "trade_date",
+        "symbol",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "amount",
+        "adj_factor"
+      ],
+      "producer": "data/client.py",
+      "consumer": "universe, factors, backtest"
+    },
+    {
+      "name": "TradableUniverse",
+      "owner": "universe",
+      "schema": [
+        "trade_date",
+        "symbol",
+        "included",
+        "exclude_reason"
+      ],
+      "producer": "universe/base.py",
+      "consumer": "factors, strategies"
+    },
+    {
+      "name": "FactorTable",
+      "owner": "features/factors",
+      "schema": [
+        "trade_date",
+        "symbol",
+        "factor_name",
+        "raw_value",
+        "direction"
+      ],
+      "producer": "factor_pipeline.py",
+      "consumer": "feature_pipeline.py"
+    },
+    {
+      "name": "FeatureTable",
+      "owner": "features/engineering",
+      "schema": [
+        "trade_date",
+        "symbol",
+        "feature_*",
+        "composite_score"
+      ],
+      "producer": "feature_pipeline.py",
+      "consumer": "models, strategies"
+    },
+    {
+      "name": "PredictionPanel",
+      "owner": "models",
+      "schema": [
+        "trade_date",
+        "symbol",
+        "score",
+        "predicted_return",
+        "model_id"
+      ],
+      "producer": "models/base.py",
+      "consumer": "strategies"
+    },
+    {
+      "name": "Signals",
+      "owner": "strategies",
+      "schema": [
+        "trade_date",
+        "symbol",
+        "score",
+        "target_inclusion",
+        "action_reason"
+      ],
+      "producer": "BaseStrategy.generate_signals",
+      "consumer": "portfolio"
+    },
+    {
+      "name": "TargetPortfolio",
+      "owner": "portfolio",
+      "schema": [
+        "trade_date",
+        "symbol",
+        "target_weight",
+        "target_value"
+      ],
+      "producer": "portfolio/rebalance.py",
+      "consumer": "risk, execution"
+    },
+    {
+      "name": "OrderFill",
+      "owner": "execution",
+      "schema": [
+        "trade_date",
+        "symbol",
+        "side",
+        "shares",
+        "price",
+        "cost",
+        "status",
+        "reason"
+      ],
+      "producer": "execution/simulator.py",
+      "consumer": "backtest, risk"
+    },
+    {
+      "name": "BacktestResult",
+      "owner": "backtest",
+      "schema": [
+        "summary",
+        "equity_curve",
+        "positions",
+        "orders",
+        "risk_report",
+        "factor_snapshot"
+      ],
+      "producer": "backtest/result.py",
+      "consumer": "dashboard, agents"
+    }
+  ],
+  "runbooks": [
+    {
+      "id": "add-factor",
+      "title": "新增一个因子",
+      "target_page": "factors",
+      "steps": [
+        "写 FactorSpec",
+        "补 required_fields",
+        "接入 factor_pipeline",
+        "跑 IC/分组收益",
+        "写入实验账本"
+      ],
+      "done": [
+        "FactorTable 有新列",
+        "覆盖率 > 95%",
+        "IC/IR 页面可见"
+      ]
+    },
+    {
+      "id": "run-backtest",
+      "title": "跑一次标准回测",
+      "target_page": "backtest",
+      "steps": [
+        "选择 strategy_config",
+        "锁定 data_version",
+        "生成 signals",
+        "组合+风控+执行",
+        "保存 BacktestResult"
+      ],
+      "done": [
+        "summary/equity/orders/risk_report 全部存在",
+        "无 NaN",
+        "可和历史最佳比较"
+      ]
+    },
+    {
+      "id": "promote-model",
+      "title": "提升一个模型版本",
+      "target_page": "models",
+      "steps": [
+        "walk-forward 训练",
+        "记录特征和标签窗口",
+        "比较样本外 IC",
+        "检查风控和换手",
+        "人工确认"
+      ],
+      "done": [
+        "模型版本可追溯",
+        "样本外优于基线",
+        "没有违反风险阈值"
+      ]
+    },
+    {
+      "id": "pre-trade-check",
+      "title": "交易前检查",
+      "target_page": "risk",
+      "steps": [
+        "数据新鲜度",
+        "涨跌停/停牌",
+        "单票/行业集中",
+        "换手和容量",
+        "订单拒单模拟"
+      ],
+      "done": [
+        "RiskResult 为 pass/warning",
+        "所有 fail 必须阻断执行"
+      ]
+    }
+  ]
+}
