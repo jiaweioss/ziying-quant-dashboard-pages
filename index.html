@@ -276,7 +276,8 @@
                 </div>
                 <div class="market-controls">
                   <div id="marketSourceButtons" class="mode-toggle market-source-toggle" aria-label="外部看盘源">
-                    <button class="mode-button active" type="button" data-source="eastmoney">东财K线</button>
+                    <button class="mode-button active" type="button" data-source="pro">Pro终端</button>
+                    <button class="mode-button" type="button" data-source="eastmoney">东财基础</button>
                     <button class="mode-button" type="button" data-source="sina">新浪新窗</button>
                     <button class="mode-button" type="button" data-source="tencent">腾讯新窗</button>
                     <button class="mode-button" type="button" data-source="tradingview">TradingView</button>
@@ -318,11 +319,34 @@
                 </div>
                 <div id="marketLatency" class="latency-badge">等待行情源</div>
               </div>
+              <div id="marketToolBar" class="market-tool-bar" aria-label="Pro terminal tools">
+                <div class="tool-group">
+                  <span>指标</span>
+                  <button type="button" data-indicator="MA">MA</button>
+                  <button type="button" data-indicator="BOLL">BOLL</button>
+                  <button type="button" data-indicator="MACD">MACD</button>
+                  <button type="button" data-indicator="RSI">RSI</button>
+                  <button type="button" data-indicator="VOL">VOL</button>
+                </div>
+                <div class="tool-group">
+                  <span>画线</span>
+                  <button type="button" data-overlay="segment">趋势线</button>
+                  <button type="button" data-overlay="horizontalStraightLine">水平线</button>
+                  <button type="button" data-overlay="rect">矩形</button>
+                  <button type="button" data-overlay="remove">清除</button>
+                </div>
+                <div class="tool-group">
+                  <span>量化</span>
+                  <button class="active" type="button" data-quant-layer="signals">买卖点</button>
+                  <button class="active" type="button" data-quant-layer="score">模型分</button>
+                  <button class="active" type="button" data-quant-layer="risk">风控线</button>
+                </div>
+              </div>
               <div id="klineSummary" class="market-summary"></div>
               <div id="externalMarketWidget" class="external-market-widget" aria-label="External market widget"></div>
               <div id="klineChart" class="kline-chart hidden" aria-label="K line chart"></div>
               <div class="kline-note">
-                看盘页现在只使用外部行情源，不读取本地 K 线。默认东财 K 线由东方财富公网接口返回 1m/5m/15m/30m/60m/日线并由本页渲染；TradingView 仅作为备选源，A 股分钟级别可能受其数据授权限制而提示不支持，且其组件署名不能被移除。
+                Pro 终端使用开源 KLineCharts 加东方财富公网接口渲染 1m/5m/15m/30m/60m/日线，支持指标、画线和量化标记叠加；TradingView 保留为备选源，A 股分钟级别可能受其数据授权限制而提示不支持，且其组件署名不能被移除。
               </div>
             </section>
           </section>

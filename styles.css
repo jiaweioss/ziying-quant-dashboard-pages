@@ -569,6 +569,48 @@ input:focus {
   margin-bottom: 12px;
 }
 
+.market-tool-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr) minmax(0, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tool-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #253746;
+  border-radius: 8px;
+  background: rgba(11, 17, 24, 0.76);
+}
+
+.tool-group span {
+  color: var(--muted);
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.tool-group button {
+  min-height: 30px;
+  border: 1px solid #2b3d4c;
+  border-radius: 7px;
+  background: #0f1721;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 750;
+  padding: 0 9px;
+}
+
+.tool-group button.active,
+.tool-group button:hover {
+  color: var(--text);
+  border-color: var(--green);
+  background: #142334;
+}
+
 .interval-buttons,
 .symbol-rack {
   display: flex;
@@ -679,6 +721,7 @@ input:focus {
 }
 
 .external-market-widget {
+  position: relative;
   height: 620px;
   width: 100%;
   min-height: 420px;
@@ -718,6 +761,50 @@ input:focus {
   max-width: 680px;
   color: var(--muted);
   line-height: 1.7;
+}
+
+.quant-signal-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+}
+
+.quant-signal {
+  position: absolute;
+  min-width: 108px;
+  padding: 8px 10px;
+  border: 1px solid #365064;
+  border-radius: 8px;
+  background: rgba(7, 12, 18, 0.88);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  display: grid;
+  gap: 3px;
+}
+
+.quant-signal strong {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #071018;
+  background: var(--green);
+}
+
+.quant-signal.sell strong {
+  background: var(--rose);
+}
+
+.quant-signal.risk strong {
+  background: var(--amber);
+}
+
+.quant-signal span,
+.quant-signal em {
+  color: var(--soft);
+  font-size: 12px;
+  font-style: normal;
 }
 
 .hidden {
@@ -1518,6 +1605,7 @@ td {
   .metric-grid,
   .market-summary,
   .market-probar,
+  .market-tool-bar,
   .chart-layout,
   .split-layout,
   .holdings-grid,

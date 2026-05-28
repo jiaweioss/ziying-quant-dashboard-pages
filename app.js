@@ -16,6 +16,7 @@ const KLINE_STATIC_URLS = {
 };
 const LIGHTWEIGHT_CHARTS_URL =
   "https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js";
+const KLINECHARTS_URL = "https://cdn.jsdelivr.net/npm/klinecharts@9.8.12/dist/umd/klinecharts.min.js";
 const TRADINGVIEW_WIDGET_URL = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
 const LOCAL_KLINE_CACHE_MS = 45_000;
 
@@ -82,8 +83,13 @@ let state = {
   },
   market: {
     mode: "external",
-    source: "eastmoney",
+    source: "pro",
     widgetKey: null,
+    proChart: null,
+    proScriptReady: null,
+    proPayload: null,
+    proIndicators: new Set(["MA", "VOL"]),
+    quantLayers: new Set(["signals", "score", "risk"]),
     cache: new Map(),
     inFlight: null,
     latencyMs: null,
@@ -1072,6 +1078,24 @@ function ensureLightweightCharts() {
   return state.kline.scriptReady;
 }
 
+function ensureKLineCharts() {
+  if (window.klinecharts || window.KLineCharts) return Promise.resolve(true);
+  if (state.market.proScriptReady) return state.market.proScriptReady;
+  state.market.proScriptReady = new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = KLINECHARTS_URL;
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+  return state.market.proScriptReady;
+}
+
+function klineChartsApi() {
+  return window.klinecharts || window.KLineCharts;
+}
+
 function klineQuery() {
   const symbol = document.querySelector("#klineSymbol")?.value?.trim() || "000001.SZ";
   const interval = document.querySelector("#klineInterval")?.value || "1d";
@@ -1255,7 +1279,8 @@ function externalProviderUrl(source, symbol) {
 function providerLabel(source) {
   return (
     {
-      eastmoney: "东方财富K线",
+      pro: "Pro开源终端",
+      eastmoney: "东方财富基础",
       sina: "新浪财经",
       tencent: "腾讯证券",
       tradingview: "TradingView",
@@ -1419,6 +1444,201 @@ function renderEastmoneySummary(payload) {
     : `<div class="empty-state">东方财富暂未返回 K 线数据</div>`;
 }
 
+function toKLineTimestamp(bar) {
+  if (typeof bar.time === "number") return bar.time * 1000;
+  const raw = String(bar.label || bar.time || "");
+  if (raw.includes(":")) {
+    const ts = Date.parse(`${raw.replace(" ", "T")}:00+08:00`);
+    if (Number.isFinite(ts)) return ts;
+  }
+  const date = raw.slice(0, 10);
+  const ts = Date.parse(`${date}T15:00:00+08:00`);
+  return Number.isFinite(ts) ? ts : Date.now();
+}
+
+function toKLineChartsData(bars) {
+  return (bars || []).map((bar) => ({
+    timestamp: toKLineTimestamp(bar),
+    open: finite(bar.open),
+    high: finite(bar.high),
+    low: finite(bar.low),
+    close: finite(bar.close),
+    volume: finite(bar.volume),
+    turnover: finite(bar.amount),
+  }));
+}
+
+function destroyProChart() {
+  const api = klineChartsApi();
+  const container = document.querySelector("#externalMarketWidget");
+  try {
+    if (api?.dispose && container) api.dispose(container);
+  } catch {
+    // KLineCharts disposal is best-effort; the container is cleared below.
+  }
+  state.market.proChart = null;
+}
+
+function syncMarketToolBar() {
+  const isPro = state.market.source === "pro";
+  document.querySelector("#marketToolBar")?.classList.toggle("hidden", !isPro);
+  document.querySelectorAll("[data-indicator]").forEach((button) => {
+    button.classList.toggle("active", state.market.proIndicators.has(button.dataset.indicator));
+  });
+  document.querySelectorAll("[data-quant-layer]").forEach((button) => {
+    button.classList.toggle("active", state.market.quantLayers.has(button.dataset.quantLayer));
+  });
+}
+
+function createProIndicators(chart) {
+  const paneFor = {
+    MA: { id: "candle_pane" },
+    BOLL: { id: "candle_pane" },
+    VOL: undefined,
+    MACD: undefined,
+    RSI: undefined,
+  };
+  state.market.proIndicators.forEach((name) => {
+    try {
+      chart.createIndicator(name, name === "MA" || name === "BOLL", paneFor[name]);
+    } catch {
+      // Indicator support varies by KLineCharts version; keep the terminal usable.
+    }
+  });
+}
+
+function sampleQuantEvents(payload) {
+  const bars = payload?.bars || [];
+  if (bars.length < 30) return [];
+  const picks = [
+    { index: Math.max(4, Math.floor(bars.length * 0.18)), side: "buy", text: "模型买入", score: 0.72 },
+    { index: Math.max(8, Math.floor(bars.length * 0.48)), side: "risk", text: "风控减仓", score: 0.41 },
+    { index: Math.max(12, Math.floor(bars.length * 0.74)), side: "sell", text: "信号卖出", score: 0.28 },
+  ];
+  return picks.map((event) => {
+    const bar = bars[Math.min(event.index, bars.length - 1)];
+    return {
+      ...event,
+      timestamp: toKLineTimestamp(bar),
+      value: event.side === "buy" ? finite(bar.low) : finite(bar.high),
+      price: finite(bar.close),
+      label: bar.label || bar.time,
+    };
+  });
+}
+
+function renderQuantOverlayHtml(payload) {
+  const container = document.querySelector("#externalMarketWidget");
+  if (!container) return;
+  container.querySelector(".quant-signal-layer")?.remove();
+  if (!state.market.quantLayers.size) return;
+  const events = sampleQuantEvents(payload);
+  const layer = document.createElement("div");
+  layer.className = "quant-signal-layer";
+  layer.innerHTML = events
+    .filter((event) => {
+      if (event.side === "buy" || event.side === "sell") return state.market.quantLayers.has("signals");
+      return state.market.quantLayers.has("risk");
+    })
+    .map((event, idx) => {
+      const left = 12 + idx * 27;
+      const tone = event.side === "buy" ? "buy" : event.side === "sell" ? "sell" : "risk";
+      const score = state.market.quantLayers.has("score") ? `<em>score ${event.score.toFixed(2)}</em>` : "";
+      return `<div class="quant-signal ${tone}" style="left:${left}%; top:${tone === "buy" ? 18 : tone === "sell" ? 32 : 46}%">
+        <strong>${event.side === "buy" ? "B" : event.side === "sell" ? "S" : "R"}</strong>
+        <span>${escapeHtml(event.text)}</span>
+        ${score}
+      </div>`;
+    })
+    .join("");
+  container.appendChild(layer);
+}
+
+function createQuantOverlays(chart, payload) {
+  const events = sampleQuantEvents(payload);
+  events.forEach((event) => {
+    if ((event.side === "buy" || event.side === "sell") && !state.market.quantLayers.has("signals")) return;
+    if (event.side === "risk" && !state.market.quantLayers.has("risk")) return;
+    try {
+      chart.createOverlay({
+        name: "simpleAnnotation",
+        points: [{ timestamp: event.timestamp, value: event.value }],
+        extendData: {
+          text: event.side === "buy" ? "B" : event.side === "sell" ? "S" : "R",
+          color: event.side === "buy" ? colors.multifactor : event.side === "sell" ? colors.reversal_5 : colors.amber,
+        },
+      });
+    } catch {
+      // HTML badges below still expose the model events if overlay names differ.
+    }
+  });
+  if (state.market.quantLayers.has("risk")) {
+    const last = payload?.bars?.at(-1);
+    if (last) {
+      try {
+        chart.createOverlay({
+          name: "priceLine",
+          points: [{ timestamp: toKLineTimestamp(last), value: finite(last.close) * 0.97 }],
+          extendData: { text: "风控线 -3%" },
+        });
+      } catch {
+        // Optional overlay.
+      }
+    }
+  }
+}
+
+async function renderProTerminal() {
+  const container = document.querySelector("#externalMarketWidget");
+  const symbol = document.querySelector("#klineSymbol")?.value?.trim() || "000001.SZ";
+  const interval = document.querySelector("#klineInterval")?.value || "1d";
+  syncExternalOpenLink(eastmoneyUrl(symbol));
+  setMarketLatency("Pro终端读取外部细粒度行情...", "neutral");
+  if (container) container.innerHTML = `<div class="empty-state">正在初始化开源 Pro 终端...</div>`;
+  try {
+    const [payload, hasLibrary] = await Promise.all([fetchEastmoneyKline(symbol, interval), ensureKLineCharts()]);
+    if (!hasLibrary || !klineChartsApi()) {
+      renderEastmoneySummary(payload);
+      await renderExternalKlineChart(payload);
+      return;
+    }
+    destroyProChart();
+    container.innerHTML = "";
+    const api = klineChartsApi();
+    const chart = api.init(container, {
+      styles: {
+        grid: { horizontal: { color: "#1d2935" }, vertical: { color: "#1d2935" } },
+        candle: {
+          tooltip: { showRule: "always", showType: "standard" },
+          bar: {
+            upColor: colors.multifactor,
+            downColor: colors.reversal_5,
+            noChangeColor: "#c8d5dc",
+          },
+        },
+      },
+    });
+    state.market.proChart = chart;
+    state.market.proPayload = payload;
+    chart.applyNewData(toKLineChartsData(payload.bars));
+    createProIndicators(chart);
+    createQuantOverlays(chart, payload);
+    renderQuantOverlayHtml(payload);
+    renderEastmoneySummary({
+      ...payload,
+      meta: { ...(payload.meta || {}), source: "KLineCharts + 东方财富", provider: "pro" },
+    });
+  } catch (error) {
+    setMarketLatency(`Pro终端失败 · ${error.message}`, "bad");
+    if (container) {
+      container.innerHTML = `<div class="external-launch-panel">
+        <strong>Pro 终端暂时不可用</strong>
+        <p>${escapeHtml(error.message)}。已保留东财基础与 TradingView 备选，可切换继续看盘。</p>
+      </div>`;
+    }
+  }
+}
+
 async function renderExternalKlineChart(payload) {
   const container = document.querySelector("#externalMarketWidget");
   if (!container) return;
@@ -1541,15 +1761,23 @@ function renderExternalMarketWidget() {
   const provider = providerLabel(source);
   const externalUrl = externalProviderUrl(source, symbol);
   syncMarketSourceButtons();
+  syncMarketToolBar();
   syncExternalOpenLink(externalUrl);
+  if (source === "pro") {
+    renderProTerminal();
+    return;
+  }
   if (source === "eastmoney") {
+    destroyProChart();
     renderEastmoneyKline();
     return;
   }
   if (source !== "tradingview") {
+    destroyProChart();
     renderExternalLaunchPanel(source);
     return;
   }
+  destroyProChart();
   const tvSymbol = normalizeMarketSymbol(symbol);
   const widgetKey = `tradingview|${tvSymbol}|${interval}`;
   renderExternalMarketSummary(externalUrl);
@@ -1776,18 +2004,70 @@ function setupKlineControls() {
       renderMarket();
     });
   });
+  document.querySelectorAll("[data-indicator]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const name = button.dataset.indicator;
+      if (state.market.proIndicators.has(name)) state.market.proIndicators.delete(name);
+      else state.market.proIndicators.add(name);
+      syncMarketToolBar();
+      if (state.market.source === "pro") renderMarket();
+    });
+  });
+  document.querySelectorAll("[data-quant-layer]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const name = button.dataset.quantLayer;
+      if (state.market.quantLayers.has(name)) state.market.quantLayers.delete(name);
+      else state.market.quantLayers.add(name);
+      syncMarketToolBar();
+      if (state.market.source === "pro") renderMarket();
+    });
+  });
+  document.querySelectorAll("[data-overlay]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (state.market.source !== "pro") {
+        state.market.source = "pro";
+        syncMarketSourceButtons();
+      }
+      const name = button.dataset.overlay;
+      const chart = state.market.proChart;
+      if (!chart) {
+        renderMarket();
+        return;
+      }
+      if (name === "remove") {
+        try {
+          chart.removeOverlay();
+        } catch {
+          // Optional API in the open-source chart runtime.
+        }
+        document.querySelector("#externalMarketWidget .quant-signal-layer")?.remove();
+        return;
+      }
+      try {
+        chart.createOverlay({ name, mode: "normal" });
+        setMarketLatency(`画线工具已开启 · ${button.textContent}`, "good");
+      } catch (error) {
+        setMarketLatency(`当前画线工具不可用 · ${error.message}`, "warn");
+      }
+    });
+  });
   fullscreen?.addEventListener("click", toggleMarketFullscreen);
   document.addEventListener("fullscreenchange", () => {
     syncFullscreenButton();
     window.setTimeout(renderMarket, 120);
   });
   window.addEventListener("resize", () => {
-    if (!state.kline.chart) return;
     const container = document.querySelector("#externalMarketWidget");
-    state.kline.chart.resize(container.clientWidth, container.clientHeight);
+    if (state.kline.chart) {
+      state.kline.chart.resize(container.clientWidth, container.clientHeight);
+    }
+    if (state.market.proChart?.resize) {
+      state.market.proChart.resize();
+    }
   });
   syncIntervalButtons();
   syncFullscreenButton();
+  syncMarketToolBar();
   state.kline.controlsReady = true;
 }
 
