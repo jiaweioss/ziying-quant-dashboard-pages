@@ -82,6 +82,7 @@ let state = {
   },
   market: {
     mode: "external",
+    source: "eastmoney",
     widgetKey: null,
     cache: new Map(),
     inFlight: null,
@@ -1168,6 +1169,159 @@ function normalizeMarketSymbol(symbol) {
   return "SZSE:000001";
 }
 
+function normalizeAshareParts(symbol) {
+  const raw = String(symbol || "000001.SZ").trim().toUpperCase();
+  let code = "000001";
+  let market = "SZ";
+  if (/^\d{6}\.(SH|SS|SZ|BJ)$/i.test(raw)) {
+    code = raw.slice(0, 6);
+    market = raw.endsWith(".SS") ? "SH" : raw.slice(-2);
+  } else if (/^(SH|SZ|BJ)\d{6}$/i.test(raw)) {
+    market = raw.slice(0, 2);
+    code = raw.slice(2, 8);
+  } else if (/^\d{6}$/.test(raw)) {
+    code = raw;
+    market = raw.startsWith("6") || raw.startsWith("000") ? "SH" : "SZ";
+  }
+  return { code, market };
+}
+
+function displayAshareSymbol(symbol) {
+  const { code, market } = normalizeAshareParts(symbol);
+  return `${code}.${market}`;
+}
+
+function eastmoneySecid(symbol) {
+  const { code, market } = normalizeAshareParts(symbol);
+  return `${market === "SH" ? 1 : 0}.${code}`;
+}
+
+function eastmoneyKlt(interval) {
+  return (
+    {
+      "1m": "1",
+      "5m": "5",
+      "15m": "15",
+      "30m": "30",
+      "60m": "60",
+      "1d": "101",
+    }[interval] || "101"
+  );
+}
+
+function eastmoneyUrl(symbol) {
+  const { code, market } = normalizeAshareParts(symbol);
+  if ((market === "SH" && code.startsWith("000")) || code.startsWith("399")) {
+    return `https://quote.eastmoney.com/zs${code}.html`;
+  }
+  return `https://quote.eastmoney.com/${market.toLowerCase()}${code}.html`;
+}
+
+function sinaUrl(symbol) {
+  const { code, market } = normalizeAshareParts(symbol);
+  return `https://finance.sina.com.cn/realstock/company/${market.toLowerCase()}${code}/nc.shtml`;
+}
+
+function tencentUrl(symbol) {
+  const { code, market } = normalizeAshareParts(symbol);
+  return `https://gu.qq.com/${market.toLowerCase()}${code}/gp`;
+}
+
+function tradingViewChartUrl(symbol) {
+  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(normalizeMarketSymbol(symbol))}`;
+}
+
+function eastmoneyKlineApiUrl(symbol, interval) {
+  const params = new URLSearchParams({
+    secid: eastmoneySecid(symbol),
+    fields1: "f1,f2,f3,f4,f5,f6",
+    fields2: "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+    klt: eastmoneyKlt(interval),
+    fqt: "1",
+    beg: "0",
+    end: "20500101",
+    lmt: interval === "1m" ? "1000" : "800",
+  });
+  return `https://push2his.eastmoney.com/api/qt/stock/kline/get?${params.toString()}`;
+}
+
+function externalProviderUrl(source, symbol) {
+  if (source === "sina") return sinaUrl(symbol);
+  if (source === "tencent") return tencentUrl(symbol);
+  if (source === "tradingview") return tradingViewChartUrl(symbol);
+  return eastmoneyUrl(symbol);
+}
+
+function providerLabel(source) {
+  return (
+    {
+      eastmoney: "东方财富K线",
+      sina: "新浪财经",
+      tencent: "腾讯证券",
+      tradingview: "TradingView",
+    }[source] || "东方财富"
+  );
+}
+
+function parseEastmoneyTime(value, interval) {
+  if (interval === "1d") return String(value).slice(0, 10);
+  const iso = `${String(value).replace(" ", "T")}:00+08:00`;
+  const ts = Date.parse(iso);
+  return Number.isFinite(ts) ? Math.floor(ts / 1000) : String(value);
+}
+
+async function fetchEastmoneyKline(symbol, interval) {
+  const cacheKey = `eastmoney|${displayAshareSymbol(symbol)}|${interval}`;
+  const cached = state.market.cache.get(cacheKey);
+  if (cached && Date.now() - cached.loadedAt < LOCAL_KLINE_CACHE_MS) {
+    return {
+      ...cached.payload,
+      meta: { ...(cached.payload.meta || {}), cache_hit: true },
+    };
+  }
+  const startedAt = performance.now();
+  const url = eastmoneyKlineApiUrl(symbol, interval);
+  const payload = await fetchJsonLoose(url);
+  const data = payload?.data;
+  if (!data?.klines?.length) {
+    throw new Error(payload?.message || "东方财富没有返回 K 线数据");
+  }
+  const bars = data.klines
+    .map((row) => String(row).split(","))
+    .filter((parts) => parts.length >= 7)
+    .map((parts) => ({
+      time: parseEastmoneyTime(parts[0], interval),
+      label: parts[0],
+      date: parts[0].slice(0, 10).replaceAll("-", ""),
+      open: finite(parts[1]),
+      close: finite(parts[2]),
+      high: finite(parts[3]),
+      low: finite(parts[4]),
+      volume: finite(parts[5]),
+      amount: finite(parts[6]),
+      amplitude: finite(parts[7], null),
+      pct_chg: finite(parts[8], null),
+      change: finite(parts[9], null),
+      turnover: finite(parts[10], null),
+    }));
+  const result = {
+    meta: {
+      symbol: displayAshareSymbol(symbol),
+      name: data.name || "",
+      interval,
+      source: "东方财富 push2his",
+      provider: "eastmoney",
+      count: bars.length,
+      klt: eastmoneyKlt(interval),
+      url,
+      load_ms: Math.round(performance.now() - startedAt),
+    },
+    bars,
+  };
+  state.market.cache.set(cacheKey, { payload: result, loadedAt: Date.now() });
+  return result;
+}
+
 function tradingViewInterval(interval) {
   return {
     "1d": "D",
@@ -1181,24 +1335,50 @@ function tradingViewInterval(interval) {
 
 function setMarketMode(mode) {
   state.market.mode = mode;
-  document.querySelector("#marketModeExternal")?.classList.toggle("active", mode === "external");
-  document.querySelector("#marketModeLocal")?.classList.toggle("active", mode === "local");
   document.querySelector("#externalMarketWidget")?.classList.toggle("hidden", mode !== "external");
-  document.querySelector("#klineChart")?.classList.toggle("hidden", mode !== "local");
+  document.querySelector("#klineChart")?.classList.add("hidden");
 }
 
-function renderExternalMarketSummary() {
+function syncMarketSourceButtons() {
+  document.querySelectorAll("#marketSourceButtons button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.source === state.market.source);
+  });
+}
+
+function syncExternalOpenLink(url) {
+  const link = document.querySelector("#marketOpenExternal");
+  if (!link) return;
+  if (url) {
+    link.href = url;
+    link.classList.remove("disabled");
+    link.setAttribute("aria-disabled", "false");
+  } else {
+    link.href = "https://www.tradingview.com/";
+    link.classList.add("disabled");
+    link.setAttribute("aria-disabled", "true");
+  }
+}
+
+function renderExternalMarketSummary(url = null) {
   const summary = document.querySelector("#klineSummary");
   const symbol = document.querySelector("#klineSymbol")?.value?.trim() || "000001.SZ";
   const interval = document.querySelector("#klineInterval")?.value || "1d";
+  const source = state.market.source || "eastmoney";
+  const provider = providerLabel(source);
   const tvSymbol = normalizeMarketSymbol(symbol);
-  setMarketLatency("外部行情 · 实时性取决于 TradingView/交易所授权", "good");
+  const isTradingView = source === "tradingview";
+  setMarketLatency(
+    isTradingView && interval !== "1d"
+      ? "TradingView A股分钟级可能提示不支持，建议切东方财富/新浪"
+      : `${provider} · 外部看盘工具`,
+    isTradingView && interval !== "1d" ? "warn" : "good"
+  );
   summary.innerHTML = [
-    ["标的", symbol.toUpperCase(), tvSymbol],
-    ["数据源", "TradingView", "外部嵌入组件"],
-    ["周期", INTERVAL_LABELS[interval] || interval, `widget interval ${tradingViewInterval(interval)}`],
-    ["部署模式", "轻量服务器", "不落盘行情数据"],
-    ["实时性", "交易所授权决定", "A股公网组件可能存在延迟"],
+    ["标的", symbol.toUpperCase(), isTradingView ? tvSymbol : normalizeAshareParts(symbol).market + normalizeAshareParts(symbol).code],
+    ["外部源", provider, isTradingView ? "备选组件，保留官方署名" : "嵌入外部看盘页面"],
+    ["周期", INTERVAL_LABELS[interval] || interval, isTradingView ? `widget interval ${tradingViewInterval(interval)}` : "在外部页面内切换分时/K线"],
+    ["部署模式", "纯外部工具", "不读取本地 K 线，不占服务器磁盘"],
+    ["打开方式", isTradingView ? "官方 widget + 新窗口" : "iframe + 新窗口", url || "官方组件"],
   ]
     .map(
       ([label, value, note]) => `<div class="summary-chip">
@@ -1210,14 +1390,169 @@ function renderExternalMarketSummary() {
     .join("");
 }
 
+function renderEastmoneySummary(payload) {
+  const summary = document.querySelector("#klineSummary");
+  if (!summary) return;
+  const bars = payload?.bars || [];
+  const last = bars.at(-1);
+  const prev = bars.length > 1 ? bars.at(-2) : null;
+  const change = last && prev && finite(prev.close) !== 0 ? finite(last.close) / finite(prev.close) - 1 : null;
+  const meta = payload?.meta || {};
+  const loadNote = meta.cache_hit ? "缓存命中" : `${meta.load_ms ?? "-"} ms`;
+  setMarketLatency(`东方财富K线 · ${loadNote}`, "good");
+  summary.innerHTML = last
+    ? [
+        ["标的", `${meta.symbol || "--"} ${meta.name || ""}`.trim(), "东方财富公网行情"],
+        ["最新价", fmtNum(last.close, 2), last.label || last.time],
+        ["涨跌", isFiniteNumber(change) ? fmtPct(change, { signed: true }) : "-", `接口涨跌幅 ${isFiniteNumber(last.pct_chg) ? last.pct_chg.toFixed(2) + "%" : "-"}`],
+        ["成交量", fmtVolume(last.volume), "外部接口字段"],
+        ["周期", INTERVAL_LABELS[meta.interval] || meta.interval || "-", `klt ${meta.klt} · ${loadNote}`],
+      ]
+        .map(
+          ([label, value, note]) => `<div class="summary-chip">
+            <span>${label}</span>
+            <strong class="${label === "涨跌" ? valueClass(change) : ""}">${value}</strong>
+            <em>${note}</em>
+          </div>`
+        )
+        .join("")
+    : `<div class="empty-state">东方财富暂未返回 K 线数据</div>`;
+}
+
+async function renderExternalKlineChart(payload) {
+  const container = document.querySelector("#externalMarketWidget");
+  if (!container) return;
+  const bars = (payload.bars || []).map((bar) => ({
+    ...bar,
+    open: finite(bar.open),
+    high: finite(bar.high),
+    low: finite(bar.low),
+    close: finite(bar.close),
+    volume: finite(bar.volume),
+  }));
+  if (!bars.length) {
+    container.innerHTML = `<div class="empty-state">外部接口没有返回可绘制 K 线</div>`;
+    return;
+  }
+  if (state.kline.chart) {
+    state.kline.chart.remove();
+    state.kline.chart = null;
+  }
+  const hasLibrary = await ensureLightweightCharts();
+  if (!hasLibrary || !window.LightweightCharts) {
+    renderKlineFallback(container, bars);
+    return;
+  }
+  container.innerHTML = "";
+  const chart = LightweightCharts.createChart(container, {
+    layout: {
+      background: { type: "solid", color: "#0b1118" },
+      textColor: "#c8d5dc",
+    },
+    grid: {
+      vertLines: { color: "#1d2935" },
+      horzLines: { color: "#1d2935" },
+    },
+    rightPriceScale: { borderColor: "#263241" },
+    timeScale: {
+      borderColor: "#263241",
+      timeVisible: payload.meta?.interval !== "1d",
+      secondsVisible: false,
+    },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+  });
+  const candleSeries = chart.addCandlestickSeries({
+    upColor: colors.multifactor,
+    downColor: colors.reversal_5,
+    borderUpColor: colors.multifactor,
+    borderDownColor: colors.reversal_5,
+    wickUpColor: colors.multifactor,
+    wickDownColor: colors.reversal_5,
+  });
+  candleSeries.setData(bars.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })));
+  const volumeSeries = chart.addHistogramSeries({
+    priceFormat: { type: "volume" },
+    priceScaleId: "",
+  });
+  volumeSeries.priceScale().applyOptions({
+    scaleMargins: { top: 0.8, bottom: 0 },
+  });
+  volumeSeries.setData(
+    bars.map((bar) => ({
+      time: bar.time,
+      value: bar.volume,
+      color: `${klineBarColor(bar)}66`,
+    }))
+  );
+  chart.timeScale().fitContent();
+  state.kline.chart = chart;
+}
+
+async function renderEastmoneyKline() {
+  const symbol = document.querySelector("#klineSymbol")?.value?.trim() || "000001.SZ";
+  const interval = document.querySelector("#klineInterval")?.value || "1d";
+  const externalUrl = eastmoneyUrl(symbol);
+  syncExternalOpenLink(externalUrl);
+  setMarketLatency("东方财富K线读取中...", "neutral");
+  const container = document.querySelector("#externalMarketWidget");
+  if (container) container.innerHTML = `<div class="empty-state">正在读取东方财富外部 K 线...</div>`;
+  try {
+    const payload = await fetchEastmoneyKline(symbol, interval);
+    renderEastmoneySummary(payload);
+    await renderExternalKlineChart(payload);
+  } catch (error) {
+    setMarketLatency(`东方财富读取失败 · ${error.message}`, "bad");
+    renderExternalMarketSummary(externalUrl);
+    if (container) {
+      container.innerHTML = `<div class="external-launch-panel">
+        <strong>东方财富接口暂时不可用</strong>
+        <p>${escapeHtml(error.message)}。可以用新窗口打开东方财富页面，或切换到 TradingView 备选源。</p>
+        <a class="refresh-button link-button" href="${escapeHtml(externalUrl)}" target="_blank" rel="noreferrer">打开东方财富</a>
+      </div>`;
+    }
+  }
+}
+
+function renderExternalLaunchPanel(source) {
+  const container = document.querySelector("#externalMarketWidget");
+  const symbol = document.querySelector("#klineSymbol")?.value?.trim() || "000001.SZ";
+  const url = externalProviderUrl(source, symbol);
+  syncExternalOpenLink(url);
+  renderExternalMarketSummary(url);
+  if (state.kline.chart) {
+    state.kline.chart.remove();
+    state.kline.chart = null;
+  }
+  if (!container) return;
+  container.innerHTML = `<div class="external-launch-panel">
+    <span>${escapeHtml(providerLabel(source))}</span>
+    <strong>该外部站点不稳定支持嵌入</strong>
+    <p>为避免 iframe 空白，已改为新窗口打开。默认东财 K 线仍会在本页直接绘制 1m/5m/15m/30m/60m/日线。</p>
+    <a class="refresh-button link-button" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">打开${escapeHtml(providerLabel(source))}</a>
+  </div>`;
+}
+
 function renderExternalMarketWidget() {
   const container = document.querySelector("#externalMarketWidget");
   if (!container) return;
   const symbol = document.querySelector("#klineSymbol")?.value?.trim() || "000001.SZ";
   const interval = document.querySelector("#klineInterval")?.value || "1d";
+  const source = state.market.source || "eastmoney";
+  const provider = providerLabel(source);
+  const externalUrl = externalProviderUrl(source, symbol);
+  syncMarketSourceButtons();
+  syncExternalOpenLink(externalUrl);
+  if (source === "eastmoney") {
+    renderEastmoneyKline();
+    return;
+  }
+  if (source !== "tradingview") {
+    renderExternalLaunchPanel(source);
+    return;
+  }
   const tvSymbol = normalizeMarketSymbol(symbol);
-  const widgetKey = `${tvSymbol}|${interval}`;
-  renderExternalMarketSummary();
+  const widgetKey = `tradingview|${tvSymbol}|${interval}`;
+  renderExternalMarketSummary(externalUrl);
   if (state.market.widgetKey === widgetKey && container.querySelector("iframe")) return;
   state.market.widgetKey = widgetKey;
   container.innerHTML = "";
@@ -1246,17 +1581,14 @@ function renderExternalMarketWidget() {
 }
 
 function renderMarket() {
-  setMarketMode(state.market.mode);
+  state.market.mode = "external";
+  setMarketMode("external");
   syncIntervalButtons();
-  if (state.market.mode === "external") {
-    if (state.kline.chart) {
-      state.kline.chart.remove();
-      state.kline.chart = null;
-    }
-    renderExternalMarketWidget();
-    return;
+  if (state.kline.chart) {
+    state.kline.chart.remove();
+    state.kline.chart = null;
   }
-  renderKline();
+  renderExternalMarketWidget();
 }
 
 function syncIntervalButtons() {
@@ -1415,8 +1747,6 @@ function setupKlineControls() {
   const refresh = document.querySelector("#klineRefresh");
   const symbol = document.querySelector("#klineSymbol");
   const interval = document.querySelector("#klineInterval");
-  const external = document.querySelector("#marketModeExternal");
-  const local = document.querySelector("#marketModeLocal");
   const fullscreen = document.querySelector("#marketFullscreen");
   refresh?.addEventListener("click", renderMarket);
   interval?.addEventListener("change", () => {
@@ -1439,13 +1769,12 @@ function setupKlineControls() {
       renderMarket();
     });
   });
-  external?.addEventListener("click", () => {
-    state.market.mode = "external";
-    renderMarket();
-  });
-  local?.addEventListener("click", () => {
-    state.market.mode = "local";
-    renderMarket();
+  document.querySelectorAll("#marketSourceButtons button").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.market.source = button.dataset.source || "eastmoney";
+      state.market.widgetKey = null;
+      renderMarket();
+    });
   });
   fullscreen?.addEventListener("click", toggleMarketFullscreen);
   document.addEventListener("fullscreenchange", () => {
@@ -1454,7 +1783,7 @@ function setupKlineControls() {
   });
   window.addEventListener("resize", () => {
     if (!state.kline.chart) return;
-    const container = document.querySelector("#klineChart");
+    const container = document.querySelector("#externalMarketWidget");
     state.kline.chart.resize(container.clientWidth, container.clientHeight);
   });
   syncIntervalButtons();

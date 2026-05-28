@@ -275,9 +275,11 @@
                   <h2>A 股行情看盘</h2>
                 </div>
                 <div class="market-controls">
-                  <div class="mode-toggle" aria-label="看盘数据源">
-                    <button id="marketModeExternal" class="mode-button active" type="button">外部行情</button>
-                    <button id="marketModeLocal" class="mode-button" type="button">本地K线</button>
+                  <div id="marketSourceButtons" class="mode-toggle market-source-toggle" aria-label="外部看盘源">
+                    <button class="mode-button active" type="button" data-source="eastmoney">东财K线</button>
+                    <button class="mode-button" type="button" data-source="sina">新浪新窗</button>
+                    <button class="mode-button" type="button" data-source="tencent">腾讯新窗</button>
+                    <button class="mode-button" type="button" data-source="tradingview">TradingView</button>
                   </div>
                   <label class="field-label" for="klineSymbol">
                     <span>股票</span>
@@ -295,6 +297,7 @@
                     </select>
                   </label>
                   <button id="klineRefresh" class="refresh-button" type="button">刷新</button>
+                  <a id="marketOpenExternal" class="refresh-button ghost link-button" href="#" target="_blank" rel="noreferrer">新窗口</a>
                   <button id="marketFullscreen" class="refresh-button ghost" type="button">全屏</button>
                 </div>
               </div>
@@ -319,7 +322,7 @@
               <div id="externalMarketWidget" class="external-market-widget" aria-label="External market widget"></div>
               <div id="klineChart" class="kline-chart hidden" aria-label="K line chart"></div>
               <div class="kline-note">
-                服务器默认使用 TradingView 外部行情组件，不占用磁盘；切换到本地K线时优先读取 <code>/api/kline</code>，没有本地数据则降级为样例 JSON。
+                看盘页现在只使用外部行情源，不读取本地 K 线。默认东财 K 线由东方财富公网接口返回 1m/5m/15m/30m/60m/日线并由本页渲染；TradingView 仅作为备选源，A 股分钟级别可能受其数据授权限制而提示不支持，且其组件署名不能被移除。
               </div>
             </section>
           </section>

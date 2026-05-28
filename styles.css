@@ -486,17 +486,19 @@ input:focus {
 }
 
 .mode-toggle {
-  height: 42px;
+  min-height: 42px;
   padding: 3px;
   background: #0d141d;
   border: 1px solid var(--line);
   border-radius: 8px;
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 3px;
 }
 
 .mode-button {
-  min-width: 84px;
+  min-width: 92px;
+  min-height: 34px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -541,6 +543,22 @@ input:focus {
 
 .refresh-button.ghost {
   background: transparent;
+}
+
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.link-button.disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.market-source-toggle .mode-button {
+  min-width: 98px;
 }
 
 .market-probar {
@@ -674,6 +692,32 @@ input:focus {
   width: 100%;
   height: 100%;
   border: 0;
+}
+
+.external-launch-panel {
+  min-height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 28px;
+  text-align: center;
+}
+
+.external-launch-panel span {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.external-launch-panel strong {
+  font-size: 26px;
+}
+
+.external-launch-panel p {
+  max-width: 680px;
+  color: var(--muted);
+  line-height: 1.7;
 }
 
 .hidden {

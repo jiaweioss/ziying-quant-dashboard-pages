@@ -1,7 +1,7 @@
 ﻿{
-    "deployed_at":  "2026-05-28T00:06:45.6398424Z",
+    "deployed_at":  "2026-05-28T00:27:14.0327519Z",
     "source_repo":  "jiaweioss/ziying-quant-tool",
     "source_branch":  "feature/quant-company-blueprint",
-    "source_sha":  "11c5003fb6d7694874ee91e782c2545ef4feb502",
+    "source_sha":  "1fa598c0d94236f42fab61c1bf897d780ee19759",
     "public_repo":  "jiaweioss/ziying-quant-dashboard-pages"
 }
